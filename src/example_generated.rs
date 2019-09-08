@@ -4,14 +4,14 @@
 pub mod wraps_u32 {
     define_index_type! {
         /// Example documentation for the type
-        pub struct Idx32(u32);
+        pub struct Idx32 = u32;
     }
 }
 
 pub mod wraps_usize {
     define_index_type! {
         /// Example documentation for the type.
-        pub struct IdxSize(usize);
-        DEFAULT = IdxSize(0);
+        pub struct IdxSize = usize;
+        DEFAULT = IdxSize::new(0);
     }
 }
