@@ -38,7 +38,7 @@
 ///
 ///     // But I also am not too worried about it, so only
 ///     // perform the asserts in debug builds.
-///     DISABLE_MAX_INDEX_CHECK_IF = cfg!(debug_assertions);
+///     DISABLE_MAX_INDEX_CHECK_IF = !cfg!(debug_assertions);
 /// }
 /// ```
 ///
@@ -62,12 +62,12 @@
 ///
 /// #### `DISABLE_MAX_INDEX_CHECK_IF = <expr>;`
 ///
-/// Set to false to disable the assertions mentioned above. True by default.
+/// Set to true to disable the assertions mentioned above. False by default.
 ///
 /// To be clear, if this is set to false, we blindly assume all casts between
 /// `usize` and `$raw_type` succeed.
 ///
-/// A common use is setting `DISABLE_MAX_INDEX_CHECK_IF = cfg!(debug_assertions)` to
+/// A common use is setting `DISABLE_MAX_INDEX_CHECK_IF = !cfg!(debug_assertions)` to
 /// avoid the tests at compile time
 ///
 /// For the sake of clarity, disabling this cannot lead to memory unsafety -- we
@@ -421,7 +421,7 @@ macro_rules! define_index_type {
 }
 
 /// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
-#[macro_export(local_inner_macros)]
+#[macro_export]
 macro_rules! index_vec {
     ($($tokens:tt)*) => {
         $crate::IndexVec::from_vec(vec![$($tokens)*])
