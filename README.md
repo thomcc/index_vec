@@ -19,8 +19,9 @@ use index_vec::{IndexVec, index_vec};
 
 // Define a custom index type.
 index_vec::define_index_type! {
-    // In this case, use a u32 instead of a usize.
-    pub struct StrIdx(u32);
+    // Define StrIdx to use only 32 bits internally (you can use usize, u16,
+    // and even u8).
+    pub struct StrIdx = u32;
     // Note that this macro has a decent amount of configurability, so
     // be sure to read its documentation if you think it's doing
     // something you don't want.

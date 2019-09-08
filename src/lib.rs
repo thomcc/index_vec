@@ -10,7 +10,7 @@
 //! // Define a custom index type.
 //! index_vec::define_index_type! {
 //!     // In this case, use a u32 instead of a usize.
-//!     pub struct StrIdx(u32);
+//!     pub struct StrIdx = u32;
 //!     // Note that this macro has a decent amount of configurability, so
 //!     // be sure to read its documentation if you think it's doing
 //!     // something you don't want.

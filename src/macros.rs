@@ -11,8 +11,9 @@
 ///
 /// ```rust,no_run
 /// index_vec::define_index_type! {
-///     // any #[attributes] can go here.
-///     pub struct MyIndex(u32);
+///     // Note that isn't actually a type alias, `MyIndex` is
+///     // actually defined as a struct. XXX is this too confusing?
+///     pub struct MyIndex = u32;
 ///     // optional extra configuration here of the form:
 ///     // `OPTION_NAME = stuff;`
 ///     // See below for details.
@@ -31,7 +32,7 @@
 /// ```rust,no_run
 /// index_vec::define_index_type! {
 ///     #[repr(transparent)]
-///     pub struct Span(u32);
+///     pub struct Span = u32;
 ///
 ///     // Don't allow any spans with values higher this.
 ///     MAX_INDEX = 0x7fff_ff00;
@@ -83,7 +84,7 @@
 ///
 /// ```rust,no_run
 /// index_vec::define_index_type! {
-///     pub struct MyIdx(u16);
+///     pub struct MyIdx = u16;
 ///     MAX_INDEX = (u16::max_value() - 1) as usize;
 ///     // Set the default index to be an invalid index, as
 ///     // a hacky way of having this type behave somewhat
@@ -109,7 +110,7 @@
 /// index_vec::define_index_type! {
 ///     // Derive everything needs except `Debug`.
 ///     #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-///     struct MyIdx(usize);
+///     struct MyIdx = usize;
 ///     NO_DERIVES = true;
 /// }
 /// // and then implement Debug manually.
@@ -124,14 +125,14 @@ macro_rules! define_index_type {
     // public api
     (
         $(#[$attrs:meta])*
-        $v:vis struct $type:ident ($inner_v:vis $raw:ident);
+        $v:vis struct $type:ident = $raw:ident;
         $($config:tt)*
     ) => {
         define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]]
-            @decl [$v struct $type ($inner_v $raw)]
+            @decl [$v struct $type ($raw)]
             @max [(<$raw>::max_value() as usize)]
             @no_check_max [false]
             { $($config)* }
@@ -142,7 +143,7 @@ macro_rules! define_index_type {
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($inner_v:vis $raw:ident)]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$_old_no_check_max:expr]
         { DISABLE_MAX_INDEX_CHECK_IF = $no_check_max:expr; $($tok:tt)* }
@@ -151,7 +152,7 @@ macro_rules! define_index_type {
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
-            @decl [$v struct $type ($inner_v $raw)]
+            @decl [$v struct $type ($raw)]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
@@ -162,7 +163,7 @@ macro_rules! define_index_type {
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($inner_v:vis $raw:ident)]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$cm:expr]
         { MAX_INDEX = $new_max:expr; $($tok:tt)* }
@@ -171,7 +172,7 @@ macro_rules! define_index_type {
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
-            @decl [$v struct $type ($inner_v $raw)]
+            @decl [$v struct $type ($raw)]
             @max [$new_max]
             @no_check_max [$cm]
             { $($tok)* }
@@ -182,7 +183,7 @@ macro_rules! define_index_type {
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($inner_v:vis $raw:ident)]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { DEFAULT = $default_expr:expr; $($tok:tt)* }
@@ -191,7 +192,7 @@ macro_rules! define_index_type {
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
-            @decl [$v struct $type ($inner_v $raw)]
+            @decl [$v struct $type ($raw)]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
@@ -208,7 +209,7 @@ macro_rules! define_index_type {
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($inner_v:vis $raw:ident)]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { NO_DERIVES = true; $($tok:tt)* }
@@ -217,7 +218,7 @@ macro_rules! define_index_type {
             @__inner
             @attrs [$(#[$attrs])*]
             @derives []
-            @decl [$v struct $type ($inner_v $raw)]
+            @decl [$v struct $type ($raw)]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
@@ -228,7 +229,7 @@ macro_rules! define_index_type {
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($inner_v:vis $raw:ident)]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { }
@@ -236,7 +237,7 @@ macro_rules! define_index_type {
 
         $(#[$derive])*
         $(#[$attrs])*
-        $v struct $type($inner_v $raw);
+        $v struct $type { _raw: $raw }
 
         impl $type {
             /// If `Self::CHECKS_MAX_INDEX` is true, we'll assert if trying to
@@ -258,7 +259,6 @@ macro_rules! define_index_type {
                 Self::from_usize(value)
             }
 
-
             /// Construct this index type from the wrapped integer tyep.
             ///
             /// Panics if:
@@ -269,16 +269,22 @@ macro_rules! define_index_type {
                 Self::from_usize(value as usize)
             }
 
+            /// Construct this index type from one in a different domain
+            #[inline]
+            $v fn from_foreign<F: $crate::Idx>(value: F) -> Self {
+                Self::from_usize(value.index())
+            }
+
             /// Construct from a usize without any checks.
             #[inline]
             $v const fn from_usize_unchecked(value: usize) -> Self {
-                Self(value as $raw)
+                Self { _raw: value as $raw }
             }
 
             /// Construct from the underlying type without any checks.
             #[inline]
             $v const fn from_raw_unchecked(raw: $raw) -> Self {
-                Self(raw)
+                Self { _raw: raw }
             }
 
             /// Construct this index type from a usize.
@@ -289,19 +295,19 @@ macro_rules! define_index_type {
             #[inline]
             $v fn from_usize(value: usize) -> Self {
                 Self::maybe_check_index(value as usize);
-                Self(value as $raw)
+                Self { _raw: value as $raw }
             }
 
             /// Get the wrapped index as a usize.
             #[inline]
             $v fn index(self) -> usize {
-                self.as_usize()
+                self._raw as usize
             }
 
             /// Get the wrapped index.
             #[inline]
             $v fn raw(self) -> $raw {
-                self.0
+                self._raw
             }
 
             /// Asserts `v <= Self::MAX_INDEX` unless Self::CHECKS_MAX_INDEX is false.
@@ -310,12 +316,6 @@ macro_rules! define_index_type {
                 if Self::CHECKS_MAX_INDEX && (v > Self::MAX_INDEX) {
                     Self::max_check_fail(v);
                 }
-            }
-
-
-            #[inline]
-            $v fn as_usize(self) -> usize {
-                self.0 as usize
             }
 
             #[inline(never)]
@@ -428,7 +428,7 @@ macro_rules! define_index_type {
         impl From<$type> for usize {
             #[inline]
             fn from(v: $type) -> usize {
-                v.as_usize()
+                v.index()
             }
         }
 
