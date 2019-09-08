@@ -1,0 +1,14 @@
+[package]
+name = "index_vec"
+version = "0.0.1"
+authors = ["Thom Chiovoloni <chiovolonit@gmail.com>"]
+edition = "2018"
+
+[features]
+example_generated = []
+default = []
+
+[dependencies]
+
+[package.metadata.docs.rs]
+features = ["example_generated"]
