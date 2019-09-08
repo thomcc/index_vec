@@ -319,6 +319,7 @@ macro_rules! define_index_type {
             }
 
             #[inline(never)]
+            #[cold]
             fn max_check_fail(u: usize) {
                 core::panic!(
                     "index_vec index overfow: {} is outside the range [0, {})",
@@ -330,7 +331,6 @@ macro_rules! define_index_type {
             const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::min_value() as usize];
         }
 
-        #[cold]
         impl core::cmp::PartialOrd<usize> for $type {
             #[inline]
             fn partial_cmp(&self, other: &usize) -> Option<core::cmp::Ordering> {
@@ -371,6 +371,45 @@ macro_rules! define_index_type {
             #[inline]
             fn add_assign(&mut self, other: usize) {
                 *self = *self + other
+            }
+        }
+
+        impl core::ops::Sub<usize> for $type {
+            type Output = Self;
+            #[inline]
+            fn sub(self, other: usize) -> Self {
+                Self::new(self.index() - other)
+            }
+        }
+
+        impl core::ops::SubAssign<usize> for $type {
+            #[inline]
+            fn sub_assign(&mut self, other: usize) {
+                *self = *self - other;
+            }
+        }
+
+        impl core::ops::Rem<usize> for $type {
+            type Output = Self;
+            #[inline]
+            fn rem(self, other: usize) -> Self {
+                Self::new(self.index() % other)
+            }
+        }
+
+        impl core::ops::Add<$type> for usize {
+            type Output = $type;
+            #[inline]
+            fn add(self, other: $type) -> $type {
+                $type::new(self + other.index())
+            }
+        }
+
+        impl core::ops::Sub<$type> for usize {
+            type Output = $type;
+            #[inline]
+            fn sub(self, other: $type) -> $type {
+                $type::new(self - other.index())
             }
         }
 

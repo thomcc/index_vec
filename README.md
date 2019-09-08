@@ -1,13 +1,55 @@
 # `index_vec`
 
-A library mainly providing:
+A more type-safe version of using `Vec`, for when `usize`s are getting you down.
 
-- `IndexVec<IndexType, Value>`, a thin wrapper around `Vec` which only requires
-  you use `IndexType` to index into it.
+This library mainly provides `IndexVec<I, T>`, which wraps `Vec` so that it's
+accessed with `I` and not `usize`.
 
-- A macro for defining the boilerplate required to make using newtyped indices
-  palatable.
+It also defines a macro for defining new index types (for use with IndexVec).
+Mostly outputting boilerplate.
 
+## Example / Overview
+
+```rust
+use index_vec::{IndexVec, index_vec};
+
+// Define a custom index type.
+index_vec::define_index_type! {
+    // In this case, use a u32 instead of a usize.
+    pub struct StrIdx(u32);
+    // Note that this macro has a decent amount of configurability, so
+    // be sure to read its documentation if you think it's doing
+    // something you don't want.
+}
+
+// Create a vector which can be accessed using `StrIdx`s.
+let mut strs: IndexVec<StrIdx, &'static str> = index_vec!["strs", "bar", "baz"];
+
+// l is a `StrIdx`
+let l = strs.last_idx();
+assert_eq!(strs[l], "baz");
+
+let new_i = strs.push("quux");
+assert_eq!(strs[new_i], "quux");
+
+// Indices are mostly interoperable with `usize`, and support
+// a lot of what you might want to do to an index. (Note that
+// it does *not* support these with other index wrappers --
+// that seems too likely to lead to bugs).
+
+// Comparison
+assert_eq!(StrIdx::new(0), 0usize);
+// Addition
+assert_eq!(StrIdx::new(0) + 1, 1usize);
+
+// Subtraction (Note that by default, the index will panic on overflow,
+// but that can be configured in the macro)
+assert_eq!(StrIdx::new(1) - 1, 0usize);
+
+// Wrapping
+assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
+// ...
+```
 ## Background
 
 The goal is to replace the pattern of using a `type FooIdx = usize` to access a
@@ -31,19 +73,6 @@ and is a much closer copy of the code from `rustc`. Unfortunately, this means it
 does not compile on stable.
 
 If you're looking for something further from a vec and closer to a map, you might find [`handy`](https://crates.io/crates/handy), [`slotmap`](https://crates.io/crates/slotmap), or [`slab`](https://crates.io/crates/slab) to be closer what you want.
-
-## Example
-
-```rust
-use index_vec::{IndexVec, index_vec};
-
-index_vec::define_index_type! {
-    pub struct MyIdx(u32);
-}
-
-let foo: IndexVec<MyIdx, &'static str> = index_vec!["foo", "bar", "baz"];
-// Now, only `MyIdx`s can index into `foo`.
-```
 
 ## License
 

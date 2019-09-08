@@ -3,6 +3,44 @@
 //! A more type-safe version of `Vec`, for when `usize` just isn't cutting it
 //! anymore.
 //!
+//! ## Example / Overview
+//! ```rust
+//! use index_vec::{IndexVec, index_vec};
+//!
+//! // Define a custom index type.
+//! index_vec::define_index_type! {
+//!     // In this case, use a u32 instead of a usize.
+//!     pub struct StrIdx(u32);
+//!     // Note that this macro has a decent amount of configurability, so
+//!     // be sure to read its documentation if you think it's doing
+//!     // something you don't want.
+//! }
+//!
+//! // Create a vector which can be accessed using `StrIdx`s.
+//! let mut strs: IndexVec<StrIdx, &'static str> = index_vec!["strs", "bar", "baz"];
+//!
+//! // l is a `StrIdx`
+//! let l = strs.last_idx();
+//! assert_eq!(strs[l], "baz");
+//!
+//! let new_i = strs.push("quux");
+//! assert_eq!(strs[new_i], "quux");
+//!
+//! // Indices are mostly interoperable with `usize`, and support
+//! // a lot of what you might want to do to an index.
+//!
+//! // Comparison
+//! assert_eq!(StrIdx::new(0), 0usize);
+//! // Addition
+//! assert_eq!(StrIdx::new(0) + 1, 1usize);
+//!
+//! // Subtraction (Note that by default, the index will panic on overflow,
+//! // but that can be configured in the macro)
+//! assert_eq!(StrIdx::new(1) - 1, 0usize);
+//!
+//! // Wrapping
+//! assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
+//! ```
 //! ## Background
 //!
 //! The goal is to replace the pattern of using a `type FooIdx = usize` to
