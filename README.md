@@ -1,5 +1,9 @@
 # `index_vec`
 
+[![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec)
+
+**Note: Currently in alpha, but will probably stabilize by the end of the week or so**
+
 A more type-safe version of using `Vec`, for when `usize`s are getting you down.
 
 This library mainly provides `IndexVec<I, T>`, which wraps `Vec` so that it's
