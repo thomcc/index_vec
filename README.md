@@ -1,8 +1,8 @@
 # `index_vec`
 
-[![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec)
+[![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec) ![crates.io](https://img.shields.io/crates/v/index_vec.svg) [![CircleCI](https://circleci.com/gh/thomcc/index_vec.svg?style=svg)](https://circleci.com/gh/thomcc/index_vec)
 
-**Note: Currently in alpha, but will probably stabilize by the end of the week or so**
+**Note: API still subject to change for a bit prior to 0.1.0**
 
 A more type-safe version of using `Vec`, for when `usize`s are getting you down.
 

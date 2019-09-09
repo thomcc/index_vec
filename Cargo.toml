@@ -10,6 +10,9 @@ keywords = ["newtype", "vec", "index", "indexed", "usize"]
 categories = ["data-structures", "no-std", "rust-patterns"]
 readme = "README.md"
 
+[badges]
+circle-ci = { repository = "thomcc/index_vec", branch = "master" }
+
 [features]
 example_generated = []
 default = []
