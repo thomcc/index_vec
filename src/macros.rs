@@ -1,5 +1,3 @@
-
-
 /// Generate the boilerplate for a newtyped index struct, for use with
 /// `IndexVec`.
 ///
@@ -39,7 +37,7 @@
 ///
 ///     // But I also am not too worried about it, so only
 ///     // perform the asserts in debug builds.
-///     DISABLE_MAX_INDEX_CHECK_IF = !cfg!(debug_assertions);
+///     DISABLE_MAX_INDEX_CHECK = !cfg!(debug_assertions);
 /// }
 /// ```
 ///
@@ -57,18 +55,18 @@
 /// instance of `$raw_type` is valid in this index domain.
 ///
 /// Note that these tests can be disabled entirely, or conditionally, with
-/// `DISABLE_MAX_INDEX_CHECK_IF`. Additionally, the generated type has
+/// `DISABLE_MAX_INDEX_CHECK`. Additionally, the generated type has
 /// `from_usize_unchecked` and `from_raw_unchecked` functions which can be used
 /// to ignore these checks.
 ///
-/// #### `DISABLE_MAX_INDEX_CHECK_IF = <expr>;`
+/// #### `DISABLE_MAX_INDEX_CHECK = <expr>;`
 ///
 /// Set to true to disable the assertions mentioned above. False by default.
 ///
 /// To be clear, if this is set to false, we blindly assume all casts between
 /// `usize` and `$raw_type` succeed.
 ///
-/// A common use is setting `DISABLE_MAX_INDEX_CHECK_IF = !cfg!(debug_assertions)` to
+/// A common use is setting `DISABLE_MAX_INDEX_CHECK = !cfg!(debug_assertions)` to
 /// avoid the tests at compile time
 ///
 /// For the sake of clarity, disabling this cannot lead to memory unsafety -- we
@@ -120,7 +118,7 @@
 ///    }
 /// }
 /// ```
-#[macro_export(local_inner_macros)]
+#[macro_export]
 macro_rules! define_index_type {
     // public api
     (
@@ -128,7 +126,7 @@ macro_rules! define_index_type {
         $v:vis struct $type:ident = $raw:ident;
         $($config:tt)*
     ) => {
-        define_index_type!{
+        $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]]
@@ -139,16 +137,16 @@ macro_rules! define_index_type {
         }
     };
 
-    // DISABLE_MAX_INDEX_CHECK_IF
+    // DISABLE_MAX_INDEX_CHECK
     (@__inner
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @max [$max:expr]
         @no_check_max [$_old_no_check_max:expr]
-        { DISABLE_MAX_INDEX_CHECK_IF = $no_check_max:expr; $($tok:tt)* }
+        { DISABLE_MAX_INDEX_CHECK = $no_check_max:expr; $($tok:tt)* }
     ) => {
-        define_index_type!{
+        $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
@@ -168,7 +166,7 @@ macro_rules! define_index_type {
         @no_check_max [$cm:expr]
         { MAX_INDEX = $new_max:expr; $($tok:tt)* }
     ) => {
-        define_index_type!{
+        $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
@@ -188,7 +186,7 @@ macro_rules! define_index_type {
         @no_check_max [$no_check_max:expr]
         { DEFAULT = $default_expr:expr; $($tok:tt)* }
     ) => {
-        define_index_type!{
+        $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
@@ -214,7 +212,7 @@ macro_rules! define_index_type {
         @no_check_max [$no_check_max:expr]
         { NO_DERIVES = true; $($tok:tt)* }
     ) => {
-        define_index_type!{
+        $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
             @derives []
@@ -250,20 +248,12 @@ macro_rules! define_index_type {
             $v const CHECKS_MAX_INDEX: bool = !$no_check_max;
 
             /// Construct this index type from a usize. Alias for `from_usize`.
-            ///
-            /// Panics if:
-            /// - this index type is configured to panic
-            /// - `value > Self::MAX_INDEX`
             #[inline]
             $v fn new(value: usize) -> Self {
                 Self::from_usize(value)
             }
 
-            /// Construct this index type from the wrapped integer tyep.
-            ///
-            /// Panics if:
-            /// - this index type is configured to panic.
-            /// - `(value as usize) > Self::MAX_INDEX`
+            /// Construct this index type from the wrapped integer type.
             #[inline]
             $v fn from_raw(value: $raw) -> Self {
                 Self::from_usize(value as usize)
@@ -288,10 +278,6 @@ macro_rules! define_index_type {
             }
 
             /// Construct this index type from a usize.
-            ///
-            /// Panics if:
-            /// - this index type is configured to panic
-            /// - `value > Self::MAX_INDEX`
             #[inline]
             $v fn from_usize(value: usize) -> Self {
                 Self::maybe_check_index(value as usize);
@@ -363,14 +349,10 @@ macro_rules! define_index_type {
             type Output = Self;
             #[inline]
             fn add(self, other: usize) -> Self {
-                Self::new(self.index() + other)
-            }
-        }
-
-        impl core::ops::AddAssign<usize> for $type {
-            #[inline]
-            fn add_assign(&mut self, other: usize) {
-                *self = *self + other
+                // use wrapping add so that it's up to the index type whether or
+                // not to check -- e.g. if checks are disabled, they're disabled
+                // on both debug and release.
+                Self::new(self.index().wrapping_add(other))
             }
         }
 
@@ -378,7 +360,17 @@ macro_rules! define_index_type {
             type Output = Self;
             #[inline]
             fn sub(self, other: usize) -> Self {
-                Self::new(self.index() - other)
+                // use wrapping sub so that it's up to the index type whether or
+                // not to check -- e.g. if checks are disabled, they're disabled
+                // on both debug and release.
+                Self::new(self.index().wrapping_sub(other))
+            }
+        }
+
+        impl core::ops::AddAssign<usize> for $type {
+            #[inline]
+            fn add_assign(&mut self, other: usize) {
+                *self = *self + other
             }
         }
 
@@ -401,7 +393,7 @@ macro_rules! define_index_type {
             type Output = $type;
             #[inline]
             fn add(self, other: $type) -> $type {
-                $type::new(self + other.index())
+                other + self
             }
         }
 
@@ -409,7 +401,7 @@ macro_rules! define_index_type {
             type Output = $type;
             #[inline]
             fn sub(self, other: $type) -> $type {
-                $type::new(self - other.index())
+                $type::new(self.wrapping_sub(other.index()))
             }
         }
 
@@ -439,7 +431,7 @@ macro_rules! define_index_type {
             }
         }
 
-        define_index_type! { @__impl_from_rep_unless_usize $type, $raw }
+        $crate::define_index_type! { @__impl_from_rep_unless_usize $type, $raw }
     };
     (@__impl_from_rep_unless_usize $type:ident, usize) => {};
     (@__impl_from_rep_unless_usize $type:ident, $raw:ident) => {

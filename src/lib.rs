@@ -162,7 +162,6 @@ impl<I: Idx, T: fmt::Debug> fmt::Debug for IndexVec<I, T> {
     }
 }
 
-
 type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, (fn((usize, T)) -> (I, T))>;
 
 impl<I: Idx, T> IndexVec<I, T> {
@@ -236,17 +235,14 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.vec.is_empty()
     }
 
-    /// Get an iterator that moves our of our vector.
-    #[inline]
-    pub fn into_iter(self) -> vec::IntoIter<T> {
-        self.vec.into_iter()
-    }
-
     /// Similar to `self.into_iter().enumerate()` but with indices of `I` and
     /// not `usize`.
     #[inline]
     pub fn into_iter_enumerated(self) -> Enumerated<vec::IntoIter<T>, I, T> {
-        self.vec.into_iter().enumerate().map(|(i, t)| (Idx::from_usize(i), t))
+        self.vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
     }
 
     /// Get a iterator over reverences to our values.
@@ -259,7 +255,10 @@ impl<I: Idx, T> IndexVec<I, T> {
     /// `usize`.
     #[inline]
     pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
-        self.vec.iter().enumerate().map(|(i, t)| (Idx::from_usize(i), t))
+        self.vec
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
     }
 
     /// Get an interator over all our indices.
@@ -278,7 +277,10 @@ impl<I: Idx, T> IndexVec<I, T> {
     /// `usize`.
     #[inline]
     pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
-        self.vec.iter_mut().enumerate().map(|(i, t)| (Idx::from_usize(i), t))
+        self.vec
+            .iter_mut()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
     }
 
     /// Return an iterator that removes the items from the requested range. See
@@ -291,8 +293,14 @@ impl<I: Idx, T> IndexVec<I, T> {
     /// Similar to `self.drain(r).enumerate()` but with indices of `I` and not
     /// `usize`.
     #[inline]
-    pub fn drain_enumerated<R: RangeBounds<usize>>(&mut self, range: R) -> Enumerated<vec::Drain<'_, T>, I, T> {
-        self.vec.drain(range).enumerate().map(|(i, t)| (Idx::from_usize(i), t))
+    pub fn drain_enumerated<R: RangeBounds<usize>>(
+        &mut self,
+        range: R,
+    ) -> Enumerated<vec::Drain<'_, T>, I, T> {
+        self.vec
+            .drain(range)
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
     }
 
     /// Return the index of the last element, if we are not empty.
@@ -361,7 +369,10 @@ impl<I: Idx, T> IndexVec<I, T> {
 
     /// Resize ourselves in-place to `new_len`. See [`Vec::resize`].
     #[inline]
-    pub fn resize(&mut self, new_len: usize, value: T) where T: Clone {
+    pub fn resize(&mut self, new_len: usize, value: T)
+    where
+        T: Clone,
+    {
         self.vec.resize(new_len, value)
     }
 
@@ -406,7 +417,10 @@ impl<I: Idx, T> IndexVec<I, T> {
     /// Call `slice::binary_search` converting the indices it gives us back as
     /// needed.
     #[inline]
-    pub fn binary_search(&self, value: &T) -> Result<I, I> where T: Ord {
+    pub fn binary_search(&self, value: &T) -> Result<I, I>
+    where
+        T: Ord,
+    {
         match self.vec.binary_search(value) {
             Ok(i) => Ok(Idx::from_usize(i)),
             Err(i) => Err(Idx::from_usize(i)),
@@ -417,7 +431,10 @@ impl<I: Idx, T> IndexVec<I, T> {
     ///
     /// See [`Vec::extend_from_slice`].
     #[inline]
-    pub fn extend_from_slice(&mut self, other: &[T]) where T: Clone {
+    pub fn extend_from_slice(&mut self, other: &[T])
+    where
+        T: Clone,
+    {
         self.vec.extend_from_slice(other)
     }
 }
