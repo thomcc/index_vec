@@ -1,9 +1,9 @@
 [package]
 name = "index_vec"
-version = "0.0.1-alpha"
+version = "0.0.1"
 authors = ["Thom Chiovoloni <chiovolonit@gmail.com>"]
 edition = "2018"
-description = "Like `Vec` and `usize`, but with more type safety"
+description = "Newtype-style helpers for `Vec` and `usize`."
 license = "MIT/Apache-2.0"
 repository = "http://github.com/thomcc/index_vec"
 keywords = ["newtype", "vec", "index", "indexed", "usize"]
