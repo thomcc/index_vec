@@ -1,5 +1,3 @@
-//! # `index_vec`
-//!
 //! A more type-safe version of `Vec`, for when `usize` just isn't cutting it
 //! anymore.
 //!
