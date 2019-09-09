@@ -236,7 +236,7 @@ macro_rules! define_index_type {
         $(#[$derive])*
         $(#[$attrs])*
         $v struct $type { _raw: $raw }
-
+        #[allow(clippy::cast_lossless, clippy::unnecessary_cast)]
         impl $type {
             /// If `Self::CHECKS_MAX_INDEX` is true, we'll assert if trying to
             /// produce a value larger than this in any of the ctors that don't
