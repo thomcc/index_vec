@@ -2,29 +2,39 @@
 
 [![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec) ![crates.io](https://img.shields.io/crates/v/index_vec.svg) [![CircleCI](https://circleci.com/gh/thomcc/index_vec.svg?style=svg)](https://circleci.com/gh/thomcc/index_vec)
 
-**Note: API still subject to change for a bit prior to 0.1.0**
+**Note: API still unstable during 0.0.x**
 
 A more type-safe version of using `Vec`, for when `usize`s are getting you down.
 
-This library mainly provides `IndexVec<I, T>`, which wraps `Vec` so that it's
-accessed with `I` and not `usize`.
-
-It also defines a macro for defining new index types (for use with IndexVec).
-Mostly outputting boilerplate.
+This crate lets you define "newtype"-style wrappers around `usize` (or other
+integers), and `Vec<T>` so that some additional type safety can be gained at
+zero runtime cost.
 
 ## Example / Overview
 
 ```rust
 use index_vec::{IndexVec, index_vec};
 
-// Define a custom index type.
 index_vec::define_index_type! {
     // Define StrIdx to use only 32 bits internally (you can use usize, u16,
     // and even u8).
     pub struct StrIdx = u32;
-    // Note that this macro has a decent amount of configurability, so
-    // be sure to read its documentation if you think it's doing
-    // something you don't want.
+    // The defaults are very reasonable, but this macro can let
+    // you customize things quite a bit:
+
+    // By default, creating a StrIdx would check an incoming `usize against
+    // `u32::max_value()`, as u32 is the wrapped index type. Lets imagine that
+    // StrIdx has to interface with an external system that uses signed ints.
+    // We can change the checking behavior to complain on i32::max_value()
+    // instead:
+    MAX_INDEX = i32::max_value() as usize;
+
+    // We can also disable checking all-together if we are more concerned with perf
+    // than any overflow problems, or even do so, but only for debug builds: Quite
+    // pointless here, but an okay example
+    DISABLE_MAX_INDEX_CHECK = cfg!(not(debug_assertions));
+
+    // And more too, see this macro's docs for more info.
 }
 
 // Create a vector which can be accessed using `StrIdx`s.
@@ -55,6 +65,7 @@ assert_eq!(StrIdx::new(1) - 1, 0usize);
 assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
 // ...
 ```
+
 ## Background
 
 The goal is to replace the pattern of using a `type FooIdx = usize` to access a

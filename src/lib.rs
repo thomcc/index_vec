@@ -1,17 +1,35 @@
-//! A more type-safe version of `Vec`, for when `usize` just isn't cutting it
-//! anymore.
+//! This crate helps with defining "newtype"-style wrappers around `usize` (or
+//! other integers), and `Vec<T>` so that some additional type safety can be
+//! gained at zero cost.
+//!
+//! It's was initially derived from some code in `rustc`, but has diverged since
+//! then.
 //!
 //! ## Example / Overview
 //! ```rust
 //! use index_vec::{IndexVec, index_vec};
 //!
-//! // Define a custom index type.
 //! index_vec::define_index_type! {
-//!     // In this case, use a u32 instead of a usize.
+//!     // Define StrIdx to use only 32 bits internally (you can use usize, u16,
+//!     // and even u8).
 //!     pub struct StrIdx = u32;
-//!     // Note that this macro has a decent amount of configurability, so
-//!     // be sure to read its documentation if you think it's doing
-//!     // something you don't want.
+//!
+//!     // The defaults are very reasonable, but this macro can let
+//!     // you customize things quite a bit:
+//!
+//!     // By default, creating a StrIdx would check an incoming `usize against
+//!     // `u32::max_value()`, as u32 is the wrapped index type. Lets imagine that
+//!     // StrIdx has to interface with an external system that uses signed ints.
+//!     // We can change the checking behavior to complain on i32::max_value()
+//!     // instead:
+//!     MAX_INDEX = i32::max_value() as usize;
+//!
+//!     // We can also disable checking all-together if we are more concerned with perf
+//!     // than any overflow problems, or even do so, but only for debug builds: Quite
+//!     // pointless here, but an okay example
+//!     DISABLE_MAX_INDEX_CHECK = cfg!(not(debug_assertions));
+//!
+//!     // And more too, see this macro's docs for more info.
 //! }
 //!
 //! // Create a vector which can be accessed using `StrIdx`s.
@@ -29,19 +47,20 @@
 //!
 //! // Comparison
 //! assert_eq!(StrIdx::new(0), 0usize);
+//1
 //! // Addition
 //! assert_eq!(StrIdx::new(0) + 1, 1usize);
 //!
-//! // Subtraction (Note that by default, the index will panic on overflow,
-//! // but that can be configured in the macro)
+//! // Subtraction
 //! assert_eq!(StrIdx::new(1) - 1, 0usize);
 //!
 //! // Wrapping
 //! assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
+//! // ...
 //! ```
 //! ## Background
 //!
-//! The goal is to replace the pattern of using a `type FooIdx = usize` to
+//! The goal is to help with the pattern of using a `type FooIdx = usize` to
 //! access a `Vec<Foo>` with something that can statically prevent using a
 //! `FooIdx` in a `Vec<Bar>`. It's most useful if you have a bunch of indices
 //! referring to different sorts of vectors.
@@ -107,12 +126,13 @@ pub mod example_generated;
 /// large enough that you won't hit problems, or verify the size cannot overflow
 /// elsewhere.
 pub trait Idx: Copy + 'static + Ord + Debug + Hash {
-    /// Roughly equivalent to From<usize>
+    /// Equivalent to From<usize>
     fn from_usize(idx: usize) -> Self;
-    /// Roughly equivalent to Into<usize>
+    /// Equivalent to Into<usize>
     fn index(self) -> usize;
 }
 
+// XXX: Hrm...
 impl Idx for usize {
     #[inline]
     fn from_usize(idx: usize) -> Self {
