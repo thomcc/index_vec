@@ -167,83 +167,98 @@ macro_rules! define_index_type {
     (
         $(#[$attrs:meta])*
         $v:vis struct $type:ident = $raw:ident;
-        $($config:tt)*
+        $($CONFIG_NAME:ident = $value:expr;)* $(;)?
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives [#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]]
             @decl [$v struct $type ($raw)]
             @debug_fmt ["{}"]
             @max [(<$raw>::max_value() as usize)]
             @no_check_max [false]
-            { $($config)* }
         }
     };
+}
 
+/// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
+#[macro_export]
+macro_rules! index_vec {
+    ($($tokens:tt)*) => {
+        $crate::IndexVec::from_vec(vec![$($tokens)*])
+    }
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! unknown_define_index_type_option {
+    () => {};
+}
+
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __define_index_type_inner {
     // DISABLE_MAX_INDEX_CHECK
-    (@__inner
+    (
+        @configs [(DISABLE_MAX_INDEX_CHECK; $no_check_max:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$_old_no_check_max:expr]
-        { DISABLE_MAX_INDEX_CHECK = $no_check_max:expr; $($tok:tt)* }
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
             @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
-            { $($tok)* }
         }
     };
 
     // MAX_INDEX
-    (@__inner
+    (
+        @configs [(MAX_INDEX; $new_max:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$cm:expr]
-        { MAX_INDEX = $new_max:expr; $($tok:tt)* }
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
             @debug_fmt [$dbg]
             @max [$new_max]
             @no_check_max [$cm]
-            { $($tok)* }
         }
     };
 
     // DEFAULT
-    (@__inner
+    (
+        @configs [(DEFAULT; $default_expr:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        { DEFAULT = $default_expr:expr; $($tok:tt)* }
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
             @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
-            { $($tok)* }
         }
         impl Default for $type {
             #[inline]
@@ -254,67 +269,84 @@ macro_rules! define_index_type {
     };
 
     // NO_DERIVES
-    (@__inner
+    (
+        @configs [(NO_DERIVES; true) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        { NO_DERIVES = true; $($tok:tt)* }
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives []
             @decl [$v struct $type ($raw)]
             @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
-            { $($tok)* }
         }
     };
-    // DEBUG_FORMAT
-    (@__inner
-        @attrs [$(#[$attrs:meta])*]
-        @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($raw:ident)]
-        @debug_fmt [$old_dbg:expr]
-        @max [$max:expr]
-        @no_check_max [$no_check_max:expr]
-        { DEBUG_FORMAT = $dbg:expr; $($tok:tt)* }
-    ) => {
-        $crate::define_index_type!{
-            @__inner
-            @attrs [$(#[$attrs])*]
-            @derives [$(#[$derive])*]
-            @decl [$v struct $type ($raw)]
-            @debug_fmt [$dbg]
-            @max [$max]
-            @no_check_max [$no_check_max]
-            { $($tok)* }
-        }
-    };
-
-    // DISPLAY_FORMAT
-    (@__inner
+    // ignore but allow NO_DERIVES = false
+    (
+        @configs [(NO_DERIVES; false) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        { DISPLAY_FORMAT = $format:expr; $($tok:tt)* }
     ) => {
-        $crate::define_index_type!{
-            @__inner
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
+            @attrs [$(#[$attrs])*]
+            @derives [$(#[$derive:meta])*]
+            @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
+            @max [$max]
+            @no_check_max [$no_check_max]
+        }
+    };
+    // DEBUG_FORMAT
+    (
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$old_dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
+        @configs [(DEBUG_FORMAT; $dbg:expr) $(($CONFIG_NAME:ident; $value:expr))*]
+    ) => {
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
             @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
-            { $($tok)* }
+        }
+    };
+
+    // DISPLAY_FORMAT
+    (
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
+        @configs [(DISPLAY_FORMAT; $format:expr) $(($CONFIG_NAME:ident; $value:expr))*]
+    ) => {
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
+            @attrs [$(#[$attrs])*]
+            @derives [$(#[$derive])*]
+            @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
+            @max [$max]
+            @no_check_max [$no_check_max]
         }
 
         impl core::fmt::Display for $type {
@@ -324,15 +356,27 @@ macro_rules! define_index_type {
         }
     };
 
-    // finish
-    (@__inner
+    // Try to make rust emit a decent error message...
+    (
+        @configs [($other:ident; $format:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        { }
+    ) => {
+        $crate::unknown_define_index_type_option!($other);
+    };
+    // finish
+    (
+        @configs []
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
     ) => {
 
         $(#[$derive])*
@@ -410,7 +454,7 @@ macro_rules! define_index_type {
             #[inline(never)]
             #[cold]
             fn max_check_fail(u: usize) {
-                core::panic!(
+                panic!(
                     "index_vec index overfow: {} is outside the range [0, {})",
                     u,
                     Self::MAX_INDEX,
@@ -540,10 +584,10 @@ macro_rules! define_index_type {
             }
         }
 
-        $crate::define_index_type! { @__impl_from_rep_unless_usize $type, $raw }
+        $crate::__define_index_type_inner! { @implement_for_raw_unless_usize $type, $raw }
     };
-    (@__impl_from_rep_unless_usize $type:ident, usize) => {};
-    (@__impl_from_rep_unless_usize $type:ident, $raw:ident) => {
+    (@implement_for_raw_unless_usize $type:ident, usize) => {};
+    (@implement_for_raw_unless_usize $type:ident, $raw:ident) => {
         impl From<$type> for $raw {
             #[inline]
             fn from(v: $type) -> $raw {
@@ -558,12 +602,4 @@ macro_rules! define_index_type {
             }
         }
     };
-}
-
-/// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
-#[macro_export]
-macro_rules! index_vec {
-    ($($tokens:tt)*) => {
-        $crate::IndexVec::from_vec(vec![$($tokens)*])
-    }
 }
