@@ -13,5 +13,9 @@ pub mod wraps_usize {
         /// Example documentation for the type.
         pub struct IdxSize = usize;
         DEFAULT = IdxSize::new(0);
+
+        DISPLAY_FORMAT = "{}";
+
+        DEBUG_FORMAT = "::{}::";
     }
 }

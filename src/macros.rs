@@ -1,6 +1,9 @@
 /// Generate the boilerplate for a newtyped index struct, for use with
 /// `IndexVec`.
 ///
+/// In the future, if the compile-time overhead of doing so is reduced, this may
+/// be replaced with a proc macro.
+///
 /// ## Usage
 ///
 /// ### Standard
@@ -29,7 +32,6 @@
 ///
 /// ```rust,no_run
 /// index_vec::define_index_type! {
-///     #[repr(transparent)]
 ///     pub struct Span = u32;
 ///
 ///     // Don't allow any spans with values higher this.
@@ -66,8 +68,8 @@
 /// To be clear, if this is set to false, we blindly assume all casts between
 /// `usize` and `$raw_type` succeed.
 ///
-/// A common use is setting `DISABLE_MAX_INDEX_CHECK = !cfg!(debug_assertions)` to
-/// avoid the tests at compile time
+/// A common use is setting `DISABLE_MAX_INDEX_CHECK = !cfg!(debug_assertions)`
+/// to avoid the tests at compile time
 ///
 /// For the sake of clarity, disabling this cannot lead to memory unsafety -- we
 /// still go through bounds checks when accessing slices, and no unsafe code
@@ -92,29 +94,70 @@
 /// }
 /// ```
 ///
+/// #### `DEBUG_FORMAT = <expr>;`
+/// By default we write the underlying integer out in a Debug implementation
+/// with `{:?}`. Sometimes you'd like more info though. For example, the type of
+/// the index. This can be done via `DEBUG_FORMAT`:
+///
+/// ```rust
+/// index_vec::define_index_type! {
+///     struct FooIdx = usize;
+///     DEBUG_FORMAT = "Foo({})";
+/// }
+/// // Then ...
+/// # fn main() {
+/// let v = FooIdx::new(10);
+/// assert_eq!("Foo(10)", format!("{:?}", v));
+/// # }
+/// ```
+///
+/// #### `DISPLAY_FORMAT = <expr>;`
+///
+/// Similarly to `DEBUG_FORMAT`, we can implement Display for you. Unlike
+/// `DEBUG_FORMAT`, if you do not set this, we will not implement `Display` for
+/// the index type.
+///
+/// ```rust
+/// index_vec::define_index_type! {
+///     struct FooIdx = usize;
+///     DISPLAY_FORMAT = "{}";
+///     // Note that you can use both DEBUG_FORMAT and DISPLAY_FORMAT.
+///     DEBUG_FORMAT = "#<foo {}>";
+/// }
+/// // Then ...
+/// # fn main() {
+/// let v = FooIdx::new(10);
+/// assert_eq!("10", format!("{}", v));
+/// assert_eq!("#<foo 10>", format!("{:?}", v));
+/// # }
+/// ```
+///
 /// #### `NO_DERIVES = true;`
 ///
 /// By default the generated type will `derive` all traits needed to make itself
-/// work. Specifically, `Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd,
-/// Ord`. If you'd like to provide your own implementation of one of these, this
-/// is a problem.
+/// work. Specifically, `Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord`. If
+/// you'd like to provide your own implementation of one of these, this is a
+/// problem.
 ///
-/// It can be worked around by setting NO_DERIVES, and providing the
-/// implementations yourself, usually with a combination of implementing it
-/// manually and using Derives, for example, if I want to use a custom `Debug`
+/// Fortunately, it can be worked around by setting NO_DERIVES, and providing
+/// the implementations yourself, usually with a combination of implementing it
+/// manually and using Derives, for example, if I want to use a custom `Hash`
 /// impl:
 ///
 /// ```rust,no_run
 /// index_vec::define_index_type! {
-///     // Derive everything needs except `Debug`.
-///     #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+///     // Derive everything needs except `Hash`.
+///     #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 ///     struct MyIdx = usize;
 ///     NO_DERIVES = true;
 /// }
-/// // and then implement Debug manually.
-/// impl core::fmt::Debug for MyIdx {
-///    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-///        write!(f, "{}", self.raw())
+/// // and then implement Hash manually. (Note that this is just an example, and
+/// // would be a bad idea -- it's rather important that Hash and Eq behave
+/// // equivalently).
+/// impl core::hash::Hash for MyIdx {
+///    fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
+///        // Only hash the first byte, because yolo.
+///        (self.index() & 0xff).hash(h)
 ///    }
 /// }
 /// ```
@@ -129,8 +172,9 @@ macro_rules! define_index_type {
         $crate::define_index_type!{
             @__inner
             @attrs [$(#[$attrs])*]
-            @derives [#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]]
+            @derives [#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]]
             @decl [$v struct $type ($raw)]
+            @debug_fmt ["{}"]
             @max [(<$raw>::max_value() as usize)]
             @no_check_max [false]
             { $($config)* }
@@ -142,6 +186,7 @@ macro_rules! define_index_type {
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$_old_no_check_max:expr]
         { DISABLE_MAX_INDEX_CHECK = $no_check_max:expr; $($tok:tt)* }
@@ -151,6 +196,7 @@ macro_rules! define_index_type {
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
@@ -162,6 +208,7 @@ macro_rules! define_index_type {
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$cm:expr]
         { MAX_INDEX = $new_max:expr; $($tok:tt)* }
@@ -171,6 +218,7 @@ macro_rules! define_index_type {
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
             @max [$new_max]
             @no_check_max [$cm]
             { $($tok)* }
@@ -182,6 +230,7 @@ macro_rules! define_index_type {
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { DEFAULT = $default_expr:expr; $($tok:tt)* }
@@ -191,6 +240,7 @@ macro_rules! define_index_type {
             @attrs [$(#[$attrs])*]
             @derives [$(#[$derive])*]
             @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
@@ -208,6 +258,7 @@ macro_rules! define_index_type {
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { NO_DERIVES = true; $($tok:tt)* }
@@ -217,9 +268,59 @@ macro_rules! define_index_type {
             @attrs [$(#[$attrs])*]
             @derives []
             @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
             @max [$max]
             @no_check_max [$no_check_max]
             { $($tok)* }
+        }
+    };
+    // DEBUG_FORMAT
+    (@__inner
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$old_dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
+        { DEBUG_FORMAT = $dbg:expr; $($tok:tt)* }
+    ) => {
+        $crate::define_index_type!{
+            @__inner
+            @attrs [$(#[$attrs])*]
+            @derives [$(#[$derive])*]
+            @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
+            @max [$max]
+            @no_check_max [$no_check_max]
+            { $($tok)* }
+        }
+    };
+
+    // DISPLAY_FORMAT
+    (@__inner
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
+        { DISPLAY_FORMAT = $format:expr; $($tok:tt)* }
+    ) => {
+        $crate::define_index_type!{
+            @__inner
+            @attrs [$(#[$attrs])*]
+            @derives [$(#[$derive])*]
+            @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
+            @max [$max]
+            @no_check_max [$no_check_max]
+            { $($tok)* }
+        }
+
+        impl core::fmt::Display for $type {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                write!(f, $format, self.index())
+            }
         }
     };
 
@@ -228,6 +329,7 @@ macro_rules! define_index_type {
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
         { }
@@ -235,6 +337,7 @@ macro_rules! define_index_type {
 
         $(#[$derive])*
         $(#[$attrs])*
+        #[repr(transparent)]
         $v struct $type { _raw: $raw }
         #[allow(clippy::cast_lossless, clippy::unnecessary_cast)]
         impl $type {
@@ -315,6 +418,12 @@ macro_rules! define_index_type {
             }
 
             const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::min_value() as usize];
+        }
+
+        impl core::fmt::Debug for $type {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                write!(f, $dbg, self.index())
+            }
         }
 
         impl core::cmp::PartialOrd<usize> for $type {
