@@ -3,15 +3,11 @@
 [![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec) ![crates.io](https://img.shields.io/crates/v/index_vec.svg) [![CircleCI](https://circleci.com/gh/thomcc/index_vec.svg?style=svg)](https://circleci.com/gh/thomcc/index_vec)
 
 **Note: API still unstable during 0.0.x**
-
-A more type-safe version of using `Vec`, for when `usize`s are getting you down.
-
-This crate lets you define "newtype"-style wrappers around `usize` (or other
-integers), and `Vec<T>` so that some additional type safety can be gained at
-zero runtime cost.
+This crate helps with defining "newtype"-style wrappers around `usize` (or
+other integers), and `Vec<T>` so that some additional type safety can be
+gained at zero cost.
 
 ## Example / Overview
-
 ```rust
 use index_vec::{IndexVec, index_vec};
 
@@ -19,6 +15,7 @@ index_vec::define_index_type! {
     // Define StrIdx to use only 32 bits internally (you can use usize, u16,
     // and even u8).
     pub struct StrIdx = u32;
+
     // The defaults are very reasonable, but this macro can let
     // you customize things quite a bit:
 
@@ -48,47 +45,86 @@ let new_i = strs.push("quux");
 assert_eq!(strs[new_i], "quux");
 
 // Indices are mostly interoperable with `usize`, and support
-// a lot of what you might want to do to an index. (Note that
-// it does *not* support these with other index wrappers --
-// that seems too likely to lead to bugs).
+// a lot of what you might want to do to an index.
 
 // Comparison
 assert_eq!(StrIdx::new(0), 0usize);
+
 // Addition
 assert_eq!(StrIdx::new(0) + 1, 1usize);
 
-// Subtraction (Note that by default, the index will panic on overflow,
-// but that can be configured in the macro)
+// Subtraction
 assert_eq!(StrIdx::new(1) - 1, 0usize);
 
 // Wrapping
 assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
 // ...
 ```
-
 ## Background
 
-The goal is to replace the pattern of using a `type FooIdx = usize` to access a
-`Vec<Foo>` with something that can statically prevent using a `FooIdx` in a
-`Vec<Bar>`. It's most useful if you have a bunch of indices referring to
-different sorts of vectors.
+The goal is to help with the pattern of using a `type FooIdx = usize` to
+access a `Vec<Foo>` with something that can statically prevent using a
+`FooIdx` in a `Vec<Bar>`. It's most useful if you have a bunch of indices
+referring to different sorts of vectors.
 
-Much of the code for this is taken from `rustc`'s `IndexVec` code, however it's
-diverged a decent amount at this point. The largest differences are:
-
-- No usage of unstable features.
-- Different syntax for defining index types.
-- Allows use of index types beyond `u32` (`usize`, `u32`, `u16`, and `u8` are
-  all supported).
-- More flexible behavior around how strictly some checks are performed.
+The code was originally based on `rustc`'s `IndexVec` code, however that has
+been almost entirely rewritten (except for the cases where it's trivial,
+e.g. the Vec wrapper).
 
 ## Other crates
 
-The [`indexed_vec`](https://crates.io/crates/indexed_vec) crate predates this,
-and is a much closer copy of the code from `rustc`. Unfortunately, this means it
-does not compile on stable.
+The [`indexed_vec`](https://crates.io/crates/indexed_vec) crate predates
+this, and is a much closer copy of the code from `rustc`. Unfortunately,
+this means it does not compile on stable.
 
-If you're looking for something further from a vec and closer to a map, you might find [`handy`](https://crates.io/crates/handy), [`slotmap`](https://crates.io/crates/slotmap), or [`slab`](https://crates.io/crates/slab) to be closer what you want.
+If you're looking for something further from a vec and closer to a map, you
+might find [`handy`](https://crates.io/crates/handy),
+[`slotmap`](https://crates.io/crates/slotmap), or
+[`slab`](https://crates.io/crates/slab) to be closer what you want.
+
+## FAQ
+
+#### Wouldn't `define_index_type` be better as a proc macro?
+
+Probably. It's not a proc macro because I tend to avoid them where possible
+due to wanting to minimize compile times. If the issues around proc-macro
+compile times are fixed, then I'll revisit this.
+
+I also may eventually add a proc-macro feature which is not required, but
+avoids some of the grossness.
+
+#### Does `define_index_type` do too much?
+
+Possibly. It defines a type, implements a bunch of functions on it, and
+quite a few traits. That said, it's intended to be a very painless journey
+from `Vec<T>` + `usize` to `IndexVec<I, T>`. If it left it up to the
+developer to do those things, it would be too annoying to be worth using.
+
+#### The syntax for the options in `define_index_type` is terrible.
+
+I'm open to suggestions.
+
+#### Does it support no_std?
+
+Yes, but it uses `extern crate alloc;`.
+
+#### What features are planned?
+
+Planned is a bit strong but here are the things I would find useful.
+
+- Extend the model to include a slice type, which should improve ergonomics
+  in some places.
+- Support any remaining parts of the slice/vec api.
+- Add typesafe wrappers for SmallVec/ArrayVec (behind a cargo `feature`, of
+  course).
+- Better syntax for the define_index_type macro (no concrete ideas).
+- Allow the generated type to be a tuple struct, or use a specific field
+  name.
+- Allow use of indices for string types (the primary benefit here would
+  probably be the ability to e.g. use u32 without too much pain rather than
+  mixing up indices from different strings -- but you never know!)
+- Allow index types such as NonZeroU32 and such, if it can be done sanely.
+- ...
 
 ## License
 

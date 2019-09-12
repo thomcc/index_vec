@@ -1,21 +1,24 @@
 //! This module is just for documentation purposes, and is hidden behind the
 //! `example_generated` feature, which is off by default.
+//!
+//! Note that a `cargo expand`ed version of this module (with some slight
+//! cleanup -- e.g. removing all the code that comes from builtin derives) is
+//! checked in to the [repository](https://github.com/thomcc/index_vec), and may
+//! be easier/better to look at.
 
-pub mod wraps_u32 {
-    define_index_type! {
-        /// Example documentation for the type
-        pub struct Idx32 = u32;
-    }
-}
+define_index_type! {
+    /// I'm a doc comment on the type.
+    pub struct CoolIndex = u32;
 
-pub mod wraps_usize {
-    define_index_type! {
-        /// Example documentation for the type.
-        pub struct IdxSize = usize;
-        DEFAULT = IdxSize::new(0);
+    DEFAULT = CoolIndex::new(0);
 
-        DISPLAY_FORMAT = "{}";
+    MAX_INDEX = i32::max_value() as usize;
 
-        DEBUG_FORMAT = "::{}::";
-    }
+    DISABLE_MAX_INDEX_CHECK = cfg!(not(debug_assertions));
+
+    DISPLAY_FORMAT = "{} is a ~Cool Index~";
+
+    DEBUG_FORMAT = "CI({:?})";
+
+    IMPL_RAW_CONVERSIONS = true;
 }

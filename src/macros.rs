@@ -39,7 +39,7 @@
 ///
 ///     // But I also am not too worried about it, so only
 ///     // perform the asserts in debug builds.
-///     DISABLE_MAX_INDEX_CHECK = !cfg!(debug_assertions);
+///     DISABLE_MAX_INDEX_CHECK = cfg!(not(debug_assertions));
 /// }
 /// ```
 ///
@@ -95,6 +95,7 @@
 /// ```
 ///
 /// #### `DEBUG_FORMAT = <expr>;`
+///
 /// By default we write the underlying integer out in a Debug implementation
 /// with `{:?}`. Sometimes you'd like more info though. For example, the type of
 /// the index. This can be done via `DEBUG_FORMAT`:
@@ -132,34 +133,24 @@
 /// # }
 /// ```
 ///
-/// #### `NO_DERIVES = true;`
+/// #### `IMPL_RAW_CONVERSIONS = true;`
 ///
-/// By default the generated type will `derive` all traits needed to make itself
-/// work. Specifically, `Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord`. If
-/// you'd like to provide your own implementation of one of these, this is a
-/// problem.
+/// We always automatically implement `From<usize> for YourIndex` and
+/// `From<YourIndex> for usize`. We don't do this for the "raw" type (e.g. `u32`
+/// if your type is declared as `struct FooIdx = u32;`), unless you request it
+/// via this option. It's an error to use this if your raw type is usize.
 ///
-/// Fortunately, it can be worked around by setting NO_DERIVES, and providing
-/// the implementations yourself, usually with a combination of implementing it
-/// manually and using Derives, for example, if I want to use a custom `Hash`
-/// impl:
-///
-/// ```rust,no_run
+/// ```rust
 /// index_vec::define_index_type! {
-///     // Derive everything needs except `Hash`.
-///     #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-///     struct MyIdx = usize;
-///     NO_DERIVES = true;
+///     struct FooIdx = u32;
+///     IMPL_RAW_CONVERSIONS = true;
 /// }
-/// // and then implement Hash manually. (Note that this is just an example, and
-/// // would be a bad idea -- it's rather important that Hash and Eq behave
-/// // equivalently).
-/// impl core::hash::Hash for MyIdx {
-///    fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
-///        // Only hash the first byte, because yolo.
-///        (self.index() & 0xff).hash(h)
-///    }
-/// }
+///
+/// # fn main() {
+/// let as_index = FooIdx::from(5u32);
+/// let as_u32 = u32::from(as_index);
+/// assert_eq!(as_u32, 5);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! define_index_type {
@@ -181,20 +172,11 @@ macro_rules! define_index_type {
     };
 }
 
-/// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
-#[macro_export]
-macro_rules! index_vec {
-    ($($tokens:tt)*) => {
-        $crate::IndexVec::from_vec(vec![$($tokens)*])
-    }
-}
-
 #[macro_export]
 #[doc(hidden)]
 macro_rules! unknown_define_index_type_option {
     () => {};
 }
-
 
 #[macro_export]
 #[doc(hidden)]
@@ -268,55 +250,15 @@ macro_rules! __define_index_type_inner {
         }
     };
 
-    // NO_DERIVES
-    (
-        @configs [(NO_DERIVES; true) $(($CONFIG_NAME:ident; $value:expr))*]
-        @attrs [$(#[$attrs:meta])*]
-        @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($raw:ident)]
-        @debug_fmt [$dbg:expr]
-        @max [$max:expr]
-        @no_check_max [$no_check_max:expr]
-    ) => {
-        $crate::__define_index_type_inner!{
-            @configs [$(($CONFIG_NAME; $value))*]
-            @attrs [$(#[$attrs])*]
-            @derives []
-            @decl [$v struct $type ($raw)]
-            @debug_fmt [$dbg]
-            @max [$max]
-            @no_check_max [$no_check_max]
-        }
-    };
-    // ignore but allow NO_DERIVES = false
-    (
-        @configs [(NO_DERIVES; false) $(($CONFIG_NAME:ident; $value:expr))*]
-        @attrs [$(#[$attrs:meta])*]
-        @derives [$(#[$derive:meta])*]
-        @decl [$v:vis struct $type:ident ($raw:ident)]
-        @debug_fmt [$dbg:expr]
-        @max [$max:expr]
-        @no_check_max [$no_check_max:expr]
-    ) => {
-        $crate::__define_index_type_inner!{
-            @configs [$(($CONFIG_NAME; $value))*]
-            @attrs [$(#[$attrs])*]
-            @derives [$(#[$derive:meta])*]
-            @decl [$v struct $type ($raw)]
-            @debug_fmt [$dbg]
-            @max [$max]
-            @no_check_max [$no_check_max]
-        }
-    };
     // DEBUG_FORMAT
     (
+        @configs [(DEBUG_FORMAT; $dbg:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$old_dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        @configs [(DEBUG_FORMAT; $dbg:expr) $(($CONFIG_NAME:ident; $value:expr))*]
     ) => {
         $crate::__define_index_type_inner!{
             @configs [$(($CONFIG_NAME; $value))*]
@@ -331,13 +273,13 @@ macro_rules! __define_index_type_inner {
 
     // DISPLAY_FORMAT
     (
+        @configs [(DISPLAY_FORMAT; $format:expr) $(($CONFIG_NAME:ident; $value:expr))*]
         @attrs [$(#[$attrs:meta])*]
         @derives [$(#[$derive:meta])*]
         @decl [$v:vis struct $type:ident ($raw:ident)]
         @debug_fmt [$dbg:expr]
         @max [$max:expr]
         @no_check_max [$no_check_max:expr]
-        @configs [(DISPLAY_FORMAT; $format:expr) $(($CONFIG_NAME:ident; $value:expr))*]
     ) => {
         $crate::__define_index_type_inner!{
             @configs [$(($CONFIG_NAME; $value))*]
@@ -356,6 +298,42 @@ macro_rules! __define_index_type_inner {
         }
     };
 
+    // IMPL_RAW_CONVERSIONS
+    (
+        @configs [(IMPL_RAW_CONVERSIONS; $val:expr) $(($CONFIG_NAME:ident; $value:expr))*]
+        @attrs [$(#[$attrs:meta])*]
+        @derives [$(#[$derive:meta])*]
+        @decl [$v:vis struct $type:ident ($raw:ident)]
+        @debug_fmt [$dbg:expr]
+        @max [$max:expr]
+        @no_check_max [$no_check_max:expr]
+    ) => {
+        $crate::__define_index_type_inner!{
+            @configs [$(($CONFIG_NAME; $value))*]
+            @attrs [$(#[$attrs])*]
+            @derives [$(#[$derive])*]
+            @decl [$v struct $type ($raw)]
+            @debug_fmt [$dbg]
+            @max [$max]
+            @no_check_max [$no_check_max]
+        }
+        // Ensure they passed in true. This is... cludgey.
+        const _: [(); 1] = [(); $val as usize];
+
+        impl From<$type> for $raw {
+            #[inline]
+            fn from(v: $type) -> $raw {
+                v.raw()
+            }
+        }
+
+        impl From<$raw> for $type {
+            #[inline]
+            fn from(value: $raw) -> Self {
+                Self::from_raw(value)
+            }
+        }
+    };
     // Try to make rust emit a decent error message...
     (
         @configs [($other:ident; $format:expr) $(($CONFIG_NAME:ident; $value:expr))*]
@@ -383,7 +361,7 @@ macro_rules! __define_index_type_inner {
         $(#[$attrs])*
         #[repr(transparent)]
         $v struct $type { _raw: $raw }
-        #[allow(clippy::cast_lossless, clippy::unnecessary_cast)]
+
         impl $type {
             /// If `Self::CHECKS_MAX_INDEX` is true, we'll assert if trying to
             /// produce a value larger than this in any of the ctors that don't
@@ -427,7 +405,7 @@ macro_rules! __define_index_type_inner {
             /// Construct this index type from a usize.
             #[inline]
             $v fn from_usize(value: usize) -> Self {
-                Self::maybe_check_index(value as usize);
+                Self::check_index(value as usize);
                 Self { _raw: value as $raw }
             }
 
@@ -445,20 +423,10 @@ macro_rules! __define_index_type_inner {
 
             /// Asserts `v <= Self::MAX_INDEX` unless Self::CHECKS_MAX_INDEX is false.
             #[inline]
-            $v fn maybe_check_index(v: usize) {
+            $v fn check_index(v: usize) {
                 if Self::CHECKS_MAX_INDEX && (v > Self::MAX_INDEX) {
-                    Self::max_check_fail(v);
+                    $crate::__max_check_fail(v, Self::MAX_INDEX);
                 }
-            }
-
-            #[inline(never)]
-            #[cold]
-            fn max_check_fail(u: usize) {
-                panic!(
-                    "index_vec index overfow: {} is outside the range [0, {})",
-                    u,
-                    Self::MAX_INDEX,
-                );
             }
 
             const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::min_value() as usize];
@@ -581,24 +549,6 @@ macro_rules! __define_index_type_inner {
             #[inline]
             fn from(value: usize) -> Self {
                 $type::from_usize(value)
-            }
-        }
-
-        $crate::__define_index_type_inner! { @implement_for_raw_unless_usize $type, $raw }
-    };
-    (@implement_for_raw_unless_usize $type:ident, usize) => {};
-    (@implement_for_raw_unless_usize $type:ident, $raw:ident) => {
-        impl From<$type> for $raw {
-            #[inline]
-            fn from(v: $type) -> $raw {
-                v.raw()
-            }
-        }
-
-        impl From<$raw> for $type {
-            #[inline]
-            fn from(value: $raw) -> Self {
-                Self::from_raw(value)
             }
         }
     };

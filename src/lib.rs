@@ -2,9 +2,6 @@
 //! other integers), and `Vec<T>` so that some additional type safety can be
 //! gained at zero cost.
 //!
-//! It's was initially derived from some code in `rustc`, but has diverged since
-//! then.
-//!
 //! ## Example / Overview
 //! ```rust
 //! use index_vec::{IndexVec, index_vec};
@@ -47,7 +44,7 @@
 //!
 //! // Comparison
 //! assert_eq!(StrIdx::new(0), 0usize);
-//1
+//!
 //! // Addition
 //! assert_eq!(StrIdx::new(0) + 1, 1usize);
 //!
@@ -65,14 +62,9 @@
 //! `FooIdx` in a `Vec<Bar>`. It's most useful if you have a bunch of indices
 //! referring to different sorts of vectors.
 //!
-//! Much of the code for this is taken from `rustc`'s `IndexVec` code, however
-//! it's diverged a decent amount at this point. Some notable changes:
-//!
-//! - No usage of unstable features.
-//! - Different syntax for defining index types.
-//! - More complete mirroring of Vec's API.
-//! - Allows use of using other index types than `u32`/`usize`.
-//! - More flexible behavior around how strictly some checks are performed,
+//! The code was originally based on `rustc`'s `IndexVec` code, however that has
+//! been almost entirely rewritten (except for the cases where it's trivial,
+//! e.g. the Vec wrapper).
 //!
 //! ## Other crates
 //!
@@ -84,7 +76,48 @@
 //! might find [`handy`](https://crates.io/crates/handy),
 //! [`slotmap`](https://crates.io/crates/slotmap), or
 //! [`slab`](https://crates.io/crates/slab) to be closer what you want.
-
+//!
+//! ## FAQ
+//!
+//! #### Wouldn't `define_index_type` be better as a proc macro?
+//!
+//! Probably. It's not a proc macro because I tend to avoid them where possible
+//! due to wanting to minimize compile times. If the issues around proc-macro
+//! compile times are fixed, then I'll revisit this.
+//!
+//! I also may eventually add a proc-macro feature which is not required, but
+//! avoids some of the grossness.
+//!
+//! #### Does `define_index_type` do too much?
+//!
+//! Possibly. It defines a type, implements a bunch of functions on it, and
+//! quite a few traits. That said, it's intended to be a very painless journey
+//! from `Vec<T>` + `usize` to `IndexVec<I, T>`. If it left it up to the
+//! developer to do those things, it would be too annoying to be worth using.
+//!
+//! #### The syntax for the options in `define_index_type` is terrible.
+//!
+//! I'm open to suggestions.
+//!
+//! #### What features are planned?
+//!
+//! Planned is a bit strong but here are the things I would find useful.
+//!
+//! - Extend the model to include a slice type, which should improve ergonomics
+//!   in some places.
+//! - Support any remaining parts of the slice/vec api.
+//! - Add typesafe wrappers for SmallVec/ArrayVec (behind a cargo `feature`, of
+//!   course).
+//! - Better syntax for the define_index_type macro (no concrete ideas).
+//! - Allow the generated type to be a tuple struct, or use a specific field
+//!   name.
+//! - Allow use of indices for string types (the primary benefit here would
+//!   probably be the ability to e.g. use u32 without too much pain rather than
+//!   mixing up indices from different strings -- but you never know!)
+//! - Allow index types such as NonZeroU32 and such, if it can be done sanely.
+//! - ...
+//!
+#![allow(clippy::partialeq_ne_impl)]
 #![no_std]
 extern crate alloc;
 
@@ -95,15 +128,14 @@ use core::fmt::Debug;
 use core::hash::Hash;
 use core::iter::{self, FromIterator};
 use core::marker::PhantomData;
-use core::ops::{Index, IndexMut, Range, RangeBounds};
+use core::ops::{Index, IndexMut, Range};
 use core::slice;
-use core::u32;
 
 #[macro_use]
 mod macros;
 pub use macros::*;
 
-#[cfg(feature = "example_generated")]
+#[cfg(any(test, feature = "example_generated"))]
 pub mod example_generated;
 
 /// Represents a wrapped value convertable to and from a `usize`.
@@ -117,43 +149,31 @@ pub mod example_generated;
 /// `usize` to an `Idx` implementation might have to handle overflow.
 ///
 /// The way overflow is handled is up to the implementation of `Idx`, but it's
-/// generally panicing, unless it was turned off via the `CHECK_MAX_INDEX_IF`
-/// parameter in `define_index_type`.
+/// generally panicing, unless it was turned off via the
+/// `DISABLE_MAX_INDEX_CHECK` option in [`define_index_type!`]. If you need more
+/// subtle handling than this, then you're on your own (or, well, either handle
+/// it earlier, or pick a bigger index type).
 ///
-/// This trait, as you can see, doesn't have a `try_from_usize`. The `IndexVec`
-/// type doesn't have additional functions exposing ways to handle index
-/// overflow. I'm open to adding these, but at the moment you should pick a size
-/// large enough that you won't hit problems, or verify the size cannot overflow
-/// elsewhere.
+/// Note: I'm open for suggestions on how to handle this case, but do not want
+/// the typical cases (E.g. Idx is a newtyped usize or u32), to become more
+/// complex.
 pub trait Idx: Copy + 'static + Ord + Debug + Hash {
-    /// Equivalent to From<usize>
+    /// Construct an Index from a usize. This is equivalent to From<usize>.
+    ///
+    /// Note that this will panic if `idx` does not fit (unless checking has
+    /// been disabled, as mentioned above). Also note that `Idx` implementations
+    /// are free to define what "fit" means as they desire.
     fn from_usize(idx: usize) -> Self;
-    /// Equivalent to Into<usize>
+
+    /// Get the underlying index. This is equivalent to Into<usize>
     fn index(self) -> usize;
 }
 
-// XXX: Hrm...
-impl Idx for usize {
-    #[inline]
-    fn from_usize(idx: usize) -> Self {
-        idx
-    }
-    #[inline]
-    fn index(self) -> usize {
-        self
-    }
-}
-
-impl Idx for u32 {
-    #[inline]
-    fn from_usize(idx: usize) -> Self {
-        assert!(idx <= u32::max_value() as usize);
-        idx as u32
-    }
-
-    #[inline]
-    fn index(self) -> usize {
-        self as usize
+/// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
+#[macro_export]
+macro_rules! index_vec {
+    ($($tokens:tt)*) => {
+        $crate::IndexVec::from_vec(vec![$($tokens)*])
     }
 }
 
@@ -163,7 +183,50 @@ impl Idx for u32 {
 /// public property. This is in part because I know this API is not a complete
 /// mirror of Vec's (patches welcome). In the worst case, you can always do what
 /// you need to the Vec itself.
-#[derive(Clone, PartialEq, Eq, Hash)]
+///
+/// ## Some notes on the APIs
+///
+/// - Most of the Vec/Slice APIs are present.
+///     - Any that aren't can be trivially accessed on the underlying `vec`
+///       field, which is public.
+///     - Most of the ones that aren't re-exposed I'm still thinking about, I
+///       belive I got the obvious ones.
+///
+/// - Apis that take or return usizes referring to the positions of items were
+///   replaced with ones that take Idx.
+///
+/// - Apis that take `R: RangeBounds<usize>` take an
+///   [`IdxRangeBounds<I>`][IdxRangeBounds], which is basically a
+///   `RangeBounds<I>`.
+///
+/// - Most iterator functions where `the_iter().enumerate()` would refer to
+///   indices have been given `_enumerated` variants. E.g.
+///   [`IndexVec::iter_enumerated`], [`IndexVec::drain_enumerated`], etc. This
+///   is because `v.iter().enumerate()` would be `(usize, &T)`, but you want
+///   `(I, &T)`.
+///
+/// ## APIs not present on `Vec<T>` or `[T]`
+///
+/// The following extensions are added:
+///
+/// - [`IndexVec::indices`]: an Iterator over the indices of type `I`.
+/// - [`IndexVec::next_idx`], [`IndexVec::last_idx`] give the next and most
+///   recent index returned by `push`.
+/// - [`IndexVec::push`] returns the index the item was inserted at.
+/// - Various `enumerated` iterators mentioned earlier
+/// - [`IndexVec::position`], [`IndexVec::rposition`] as
+///   `self.iter().position()` will return a `Option<usize>`
+///
+/// ## Pitfalls / Gotchas
+///
+/// - `IndexVec<I, T>` is not `Deref<Target = [T]>`. This means it does not
+///   auto-coerce into &[T] when needed. I think this is for the best, but could
+///   probably be convinced otherwise.
+///
+///   At the moment, we attempt to make up for this by wrapping the bulk of the
+///   API for slices as well, but still. Note that you still can access the vec
+///   directly whenever you need.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IndexVec<I: Idx, T> {
     /// Our wrapped Vec.
     pub vec: Vec<T>,
@@ -179,7 +242,6 @@ impl<I: Idx, T: fmt::Debug> fmt::Debug for IndexVec<I, T> {
         fmt::Debug::fmt(&self.vec, fmt)
     }
 }
-
 type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, (fn((usize, T)) -> (I, T))>;
 
 impl<I: Idx, T> IndexVec<I, T> {
@@ -215,16 +277,109 @@ impl<I: Idx, T> IndexVec<I, T> {
         }
     }
 
+    /// Similar to `self.into_iter().enumerate()` but with indices of `I` and
+    /// not `usize`.
+    #[inline]
+    pub fn into_iter_enumerated(self) -> Enumerated<vec::IntoIter<T>, I, T> {
+        self.vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
+    }
+
+    /// Similar to `self.iter().enumerate()` but with indices of `I` and not
+    /// `usize`.
+    #[inline]
+    pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
+        self.vec
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
+    }
+
+    /// Get an interator over all our indices.
+    #[inline]
+    pub fn indices(&self) -> iter::Map<Range<usize>, fn(usize) -> I> {
+        (0..self.len()).map(Idx::from_usize)
+    }
+
+    /// Creates a splicing iterator that replaces the specified range in the
+    /// vector with the given `replace_with` iterator and yields the removed
+    /// items. See [`Vec::splice`]
+    pub fn splice<R, It>(
+        &mut self,
+        range: R,
+        replace_with: It,
+    ) -> vec::Splice<<It as IntoIterator>::IntoIter>
+    where
+        It: IntoIterator<Item = T>,
+        R: IdxRangeBounds<I>,
+    {
+        self.vec.splice(range.into_range(), replace_with)
+    }
+
+    /// Similar to `self.iter_mut().enumerate()` but with indices of `I` and not
+    /// `usize`.
+    #[inline]
+    pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
+        self.vec
+            .iter_mut()
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
+    }
+
+    /// Similar to `self.drain(r).enumerate()` but with indices of `I` and not
+    /// `usize`.
+    #[inline]
+    pub fn drain_enumerated<R: IdxRangeBounds<I>>(
+        &mut self,
+        range: R,
+    ) -> Enumerated<vec::Drain<'_, T>, I, T> {
+        self.vec
+            .drain(range.into_range())
+            .enumerate()
+            .map(|(i, t)| (Idx::from_usize(i), t))
+    }
+
+    /// Gives the next index that will be assigned when `push` is
+    /// called.
+    #[inline]
+    pub fn next_idx(&self) -> I {
+        I::from_usize(self.len())
+    }
+
+    /// Return the index of the last element, or panic.
+    #[inline]
+    pub fn last_idx(&self) -> I {
+        // TODO: should this still be a panic even when `I` has disabled
+        // checking?
+        assert!(!self.is_empty());
+        I::from_usize(self.len() - 1)
+    }
+
     /// Get a the storage as a `&[T]`
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        self.vec.as_slice()
+        &self.vec
     }
 
     /// Get a the storage as a `&mut [T]`
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self.vec.as_mut_slice()
+        &mut self.vec
+    }
+
+    /// Equivalent to accessing our `vec` field, but as a function.
+    #[inline]
+    pub fn as_vec(&self) -> &Vec<T> {
+        &self.vec
+    }
+
+    /// Equivalent to accessing our `vec` field mutably, but as a function, if
+    /// that's what you'd prefer.
+    #[inline]
+    pub fn as_mut_vec(&mut self) -> &mut Vec<T> {
+        &mut self.vec
     }
 
     /// Push a new item onto the vector, and return it's index.
@@ -253,72 +408,32 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.vec.is_empty()
     }
 
-    /// Similar to `self.into_iter().enumerate()` but with indices of `I` and
-    /// not `usize`.
-    #[inline]
-    pub fn into_iter_enumerated(self) -> Enumerated<vec::IntoIter<T>, I, T> {
-        self.vec
-            .into_iter()
-            .enumerate()
-            .map(|(i, t)| (Idx::from_usize(i), t))
-    }
-
     /// Get a iterator over reverences to our values.
+    ///
+    /// See also [`IndexVec::iter_enumerated`], which gives you indices (of the
+    /// correct type) as you iterate.
     #[inline]
     pub fn iter(&self) -> slice::Iter<'_, T> {
         self.vec.iter()
     }
 
-    /// Similar to `self.iter().enumerate()` but with indices of `I` and not
-    /// `usize`.
-    #[inline]
-    pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
-        self.vec
-            .iter()
-            .enumerate()
-            .map(|(i, t)| (Idx::from_usize(i), t))
-    }
-
-    /// Get an interator over all our indices.
-    #[inline]
-    pub fn indices(&self) -> iter::Map<Range<usize>, fn(usize) -> I> {
-        (0..self.len()).map(Idx::from_usize)
-    }
-
     /// Get a iterator over mut reverences to our values.
+    ///
+    /// See also [`IndexVec::iter_mut_enumerated`], which gives you indices (of
+    /// the correct type) as you iterate.
     #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
         self.vec.iter_mut()
     }
 
-    /// Similar to `self.iter_mut().enumerate()` but with indices of `I` and not
-    /// `usize`.
-    #[inline]
-    pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
-        self.vec
-            .iter_mut()
-            .enumerate()
-            .map(|(i, t)| (Idx::from_usize(i), t))
-    }
-
     /// Return an iterator that removes the items from the requested range. See
     /// [`Vec::drain`].
+    ///
+    /// See also [`IndexVec::drain_enumerated`], which gives you indices (of the
+    /// correct type) as you iterate.
     #[inline]
-    pub fn drain<R: RangeBounds<usize>>(&mut self, range: R) -> vec::Drain<'_, T> {
-        self.vec.drain(range)
-    }
-
-    /// Similar to `self.drain(r).enumerate()` but with indices of `I` and not
-    /// `usize`.
-    #[inline]
-    pub fn drain_enumerated<R: RangeBounds<usize>>(
-        &mut self,
-        range: R,
-    ) -> Enumerated<vec::Drain<'_, T>, I, T> {
-        self.vec
-            .drain(range)
-            .enumerate()
-            .map(|(i, t)| (Idx::from_usize(i), t))
+    pub fn drain<R: IdxRangeBounds<I>>(&mut self, range: R) -> vec::Drain<'_, T> {
+        self.vec.drain(range.into_range())
     }
 
     /// Return the index of the last element, if we are not empty.
@@ -331,12 +446,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.vec.shrink_to_fit()
-    }
-
-    /// Swaps two elements in our vector.
-    #[inline]
-    pub fn swap(&mut self, a: I, b: I) {
-        self.vec.swap(a.index(), b.index())
     }
 
     /// Shortens the vector, keeping the first `len` elements and dropping
@@ -358,20 +467,6 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.vec.reserve(c)
     }
 
-    /// Gives the next index that will be assigned when `push` is
-    /// called.
-    #[inline]
-    pub fn next_idx(&self) -> I {
-        I::from_usize(self.len())
-    }
-
-    /// Return the index of the last element, or panic.
-    #[inline]
-    pub fn last_idx(&self) -> I {
-        assert!(!self.is_empty());
-        I::from_usize(self.len() - 1)
-    }
-
     /// Get a ref to the item at the provided index, or None for out of bounds.
     #[inline]
     pub fn get(&self, index: I) -> Option<&T> {
@@ -383,6 +478,23 @@ impl<I: Idx, T> IndexVec<I, T> {
     #[inline]
     pub fn get_mut(&mut self, index: I) -> Option<&mut T> {
         self.vec.get_mut(index.index())
+    }
+
+    /// Returns a reference to an element, without doing bounds checking.
+    ///
+    /// This is generally not recommended, use with caution!
+    #[inline]
+    pub unsafe fn get_unchecked(&self, index: I) -> &T {
+        self.vec.get_unchecked(index.index())
+    }
+
+    /// Returns a mutable reference to an element or subslice, without doing
+    /// bounds checking.
+    ///
+    /// This is generally not recommended, use with caution!
+    #[inline]
+    pub unsafe fn get_unchecked_mut(&mut self, index: I) -> &T {
+        self.vec.get_unchecked_mut(index.index())
     }
 
     /// Resize ourselves in-place to `new_len`. See [`Vec::resize`].
@@ -426,7 +538,67 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.vec.insert(index.index(), element)
     }
 
-    /// Remove the item at `index` without maintaining order. See [`Vec::swap_remove`].
+    /// Searches for an element in an iterator, returning its index. This is
+    /// equivalent to `Iterator::position`, but returns `I` and not `usize`.
+    #[inline]
+    pub fn position<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
+        self.vec.iter().position(f).map(Idx::from_usize)
+    }
+
+    /// Searches for an element in an iterator from the right, returning its
+    /// index. This is equivalent to `Iterator::position`, but returns `I` and
+    /// not `usize`.
+    #[inline]
+    pub fn rposition<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
+        self.vec.iter().rposition(f).map(Idx::from_usize)
+    }
+
+    /// Swaps two elements in our vector.
+    #[inline]
+    pub fn swap(&mut self, a: I, b: I) {
+        self.vec.swap(a.index(), b.index())
+    }
+
+    /// Divides our slice into two at an index.
+    #[inline]
+    pub fn split_at(&self, a: I) -> (&[T], &[T]) {
+        self.vec.split_at(a.index())
+    }
+
+    /// Divides our slice into two at an index.
+    #[inline]
+    pub fn split_at_mut(&mut self, a: I) -> (&mut [T], &mut [T]) {
+        self.vec.split_at_mut(a.index())
+    }
+
+    /// Rotates our data in-place such that the first `mid` elements of the
+    /// slice move to the end while the last `self.len() - mid` elements move to
+    /// the front
+    #[inline]
+    pub fn rotate_left(&mut self, mid: I) {
+        self.vec.rotate_left(mid.index())
+    }
+
+    /// Rotates our data in-place such that the first `self.len() - k` elements
+    /// of the slice move to the end while the last `k` elements move to the
+    /// front
+    #[inline]
+    pub fn rotate_right(&mut self, k: I) {
+        self.vec.rotate_right(k.index())
+    }
+
+    /// Copies elements from one part of the slice to another part of itself,
+    /// using a memmove.
+    #[inline]
+    pub fn copy_within<R: IdxRangeBounds<I>>(&mut self, src: R, dst: I)
+    where
+        T: Copy,
+    {
+        self.vec.copy_within(src.into_range(), dst.index())
+    }
+
+    /// Remove the item at `index` without maintaining order. See
+    /// [`Vec::swap_remove`].
     #[inline]
     pub fn swap_remove(&mut self, index: I) -> T {
         self.vec.swap_remove(index.index())
@@ -445,6 +617,33 @@ impl<I: Idx, T> IndexVec<I, T> {
         }
     }
 
+    /// Binary searches this sorted vec with a comparator function, converting
+    /// the indices it gives us back to our Idx type.
+    #[inline]
+    pub fn binary_search_by<'a, F: FnMut(&'a T) -> core::cmp::Ordering>(
+        &'a self,
+        f: F,
+    ) -> Result<I, I> {
+        match self.vec.binary_search_by(f) {
+            Ok(i) => Ok(Idx::from_usize(i)),
+            Err(i) => Err(Idx::from_usize(i)),
+        }
+    }
+
+    /// Binary searches this sorted vec with a key extraction function, converting
+    /// the indices it gives us back to our Idx type.
+    #[inline]
+    pub fn binary_search_by_key<'a, B: Ord, F: FnMut(&'a T) -> B>(
+        &'a self,
+        b: &B,
+        f: F,
+    ) -> Result<I, I> {
+        match self.vec.binary_search_by_key(b, f) {
+            Ok(i) => Ok(Idx::from_usize(i)),
+            Err(i) => Err(Idx::from_usize(i)),
+        }
+    }
+
     /// Append all items in the slice to the end of our vector.
     ///
     /// See [`Vec::extend_from_slice`].
@@ -455,21 +654,86 @@ impl<I: Idx, T> IndexVec<I, T> {
     {
         self.vec.extend_from_slice(other)
     }
-}
 
-impl<I: Idx, T> Index<I> for IndexVec<I, T> {
-    type Output = T;
-
+    /// Forwards to the `Vec::sort_unstable` implementation.
     #[inline]
-    fn index(&self, index: I) -> &T {
-        &self.vec[index.index()]
+    pub fn sort_unstable(&mut self)
+    where
+        T: Ord,
+    {
+        self.vec.sort_unstable()
     }
-}
 
-impl<I: Idx, T> IndexMut<I> for IndexVec<I, T> {
+    /// Forwards to the `Vec::sort_unstable_by` implementation.
     #[inline]
-    fn index_mut(&mut self, index: I) -> &mut T {
-        &mut self.vec[index.index()]
+    pub fn sort_unstable_by<F: FnMut(&T, &T) -> core::cmp::Ordering>(&mut self, compare: F) {
+        self.vec.sort_unstable_by(compare)
+    }
+
+    /// Forwards to the `Vec::sort_unstable_by_key` implementation.
+    #[inline]
+    pub fn sort_unstable_by_key<F: FnMut(&T) -> K, K: Ord>(&mut self, f: F) {
+        self.vec.sort_unstable_by_key(f)
+    }
+
+    /// Forwards to the `Vec::ends_with` implementation.
+    #[inline]
+    pub fn ends_with(&self, needle: &[T]) -> bool
+    where
+        T: PartialEq,
+    {
+        self.vec.ends_with(needle)
+    }
+
+    /// Forwards to the `Vec::starts_with` implementation.
+    #[inline]
+    pub fn starts_with(&self, needle: &[T]) -> bool
+    where
+        T: PartialEq,
+    {
+        self.vec.starts_with(needle)
+    }
+
+    /// Forwards to the `Vec::contains` implementation.
+    #[inline]
+    pub fn contains(&self, x: &T) -> bool
+    where
+        T: PartialEq,
+    {
+        self.vec.contains(x)
+    }
+
+    /// Forwards to the `Vec::retain` implementation.
+    #[inline]
+    pub fn retain<F: FnMut(&T) -> bool>(&mut self, f: F) {
+        self.vec.retain(f)
+    }
+
+    /// Forwards to the `Vec::dedup_by_key` implementation.
+    #[inline]
+    pub fn dedup_by_key<F: FnMut(&mut T) -> K, K: PartialEq>(&mut self, key: F) {
+        self.vec.dedup_by_key(key)
+    }
+
+    /// Forwards to the `Vec::dedup` implementation.
+    #[inline]
+    pub fn dedup(&mut self)
+    where
+        T: PartialEq,
+    {
+        self.vec.dedup()
+    }
+
+    /// Forwards to the `Vec::dedup_by` implementation.
+    #[inline]
+    pub fn dedup_by<F: FnMut(&mut T, &mut T) -> bool>(&mut self, same_bucket: F) {
+        self.vec.dedup_by(same_bucket)
+    }
+
+    /// Forwards to the `Vec::reverse` implementation.
+    #[inline]
+    pub fn reverse(&mut self) {
+        self.vec.reverse()
     }
 }
 
@@ -544,5 +808,179 @@ impl<I: Idx, T> From<Vec<T>> for IndexVec<I, T> {
             vec: v,
             _marker: PhantomData,
         }
+    }
+}
+
+impl<I: Idx, T: Clone> Clone for IndexVec<I, T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            vec: self.vec.clone(),
+            _marker: PhantomData,
+        }
+    }
+    #[inline]
+    fn clone_from(&mut self, o: &Self) {
+        self.vec.clone_from(&o.vec);
+    }
+}
+
+/// This trait to function in API signatures where `Vec` uses `R:
+/// RangeBounds<usize>`. There are blanket implementations for the basic range
+/// types in `core::ops` for all Idx types. e.g. `Range<I: Idx>`, `RangeFrom<I:
+/// Idx>`, `RangeTo<I: Idx>`, etc all implement it.
+///
+/// IMO it's unfortunate that this needs to be present in the API, but it
+/// doesn't hurt that much.
+pub trait IdxRangeBounds<I>: sealer::Sealed
+where
+    I: Idx,
+{
+    type Range: core::ops::RangeBounds<usize>;
+    fn into_range(self) -> Self::Range;
+}
+
+mod sealer {
+    pub trait Sealed {}
+}
+
+impl<I: Idx> sealer::Sealed for core::ops::Range<I> {}
+impl<I: Idx> sealer::Sealed for core::ops::RangeFrom<I> {}
+impl<I: Idx> sealer::Sealed for core::ops::RangeTo<I> {}
+impl<I: Idx> sealer::Sealed for core::ops::RangeInclusive<I> {}
+impl<I: Idx> sealer::Sealed for core::ops::RangeToInclusive<I> {}
+impl sealer::Sealed for core::ops::RangeFull {}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::Range<I> {
+    type Range = core::ops::Range<usize>;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        self.start.index()..self.end.index()
+    }
+}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::RangeFrom<I> {
+    type Range = core::ops::RangeFrom<usize>;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        self.start.index()..
+    }
+}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::RangeFull {
+    type Range = core::ops::RangeFull;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        self
+    }
+}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::RangeTo<I> {
+    type Range = core::ops::RangeTo<usize>;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        ..self.end.index()
+    }
+}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::RangeInclusive<I> {
+    type Range = core::ops::RangeInclusive<usize>;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        self.start().index()..=self.end().index()
+    }
+}
+
+impl<I: Idx> IdxRangeBounds<I> for core::ops::RangeToInclusive<I> {
+    type Range = core::ops::RangeToInclusive<usize>;
+    #[inline]
+    fn into_range(self) -> Self::Range {
+        ..=self.end.index()
+    }
+}
+
+macro_rules! impl_index {
+    ($index_type: ty, $output_type: ty, |$r:ident| $e:expr) => {
+        impl<I: Idx, T> Index<$index_type> for IndexVec<I, T> {
+            type Output = $output_type;
+            #[inline]
+            fn index(&self, $r: $index_type) -> &$output_type {
+                &self.as_slice()[$e]
+            }
+        }
+
+        impl<I: Idx, T> IndexMut<$index_type> for IndexVec<I, T> {
+            #[inline]
+            fn index_mut(&mut self, $r: $index_type) -> &mut $output_type {
+                &mut self.as_mut_slice()[$e]
+            }
+        }
+    };
+}
+
+impl_index!(I, T, |r| r.index());
+impl_index!(core::ops::Range<I>, [T], |r| r.into_range());
+impl_index!(core::ops::RangeFrom<I>, [T], |r| r.into_range());
+impl_index!(core::ops::RangeTo<I>, [T], |r| r.into_range());
+impl_index!(core::ops::RangeFull, [T], |r| r);
+impl_index!(core::ops::RangeInclusive<I>, [T], |r| r.into_range());
+impl_index!(core::ops::RangeToInclusive<I>, [T], |r| r.into_range());
+
+macro_rules! impl_partialeq {
+    ($Lhs: ty, $Rhs: ty) => {
+        impl<'a, 'b, A, B, I: Idx> PartialEq<$Rhs> for $Lhs
+        where
+            A: PartialEq<B>,
+        {
+            #[inline]
+            fn eq(&self, other: &$Rhs) -> bool {
+                self[..] == other[..]
+            }
+            #[inline]
+            fn ne(&self, other: &$Rhs) -> bool {
+                self[..] != other[..]
+            }
+        }
+    };
+}
+impl_partialeq! { IndexVec<I, A>, Vec<B> }
+impl_partialeq! { IndexVec<I, A>, &'b [B] }
+impl_partialeq! { IndexVec<I, A>, &'b mut [B] }
+
+macro_rules! array_impls {
+    ($($N: expr)+) => {$(
+        impl_partialeq! { IndexVec<I, A>, [B; $N] }
+        impl_partialeq! { IndexVec<I, A>, &'b [B; $N] }
+    )+};
+}
+
+array_impls! {
+     0  1  2  3  4  5  6  7  8  9
+    10 11 12 13 14 15 16 17 18 19
+    20 21 22 23 24 25 26 27 28 29
+    30 31 32
+}
+
+#[inline(never)]
+#[cold]
+#[doc(hidden)]
+pub fn __max_check_fail(u: usize, max: usize) -> ! {
+    panic!(
+        "index_vec index overflow: {} is outside the range [0, {})",
+        u, max,
+    )
+}
+
+#[cfg(feature = "serde")]
+impl<I: Idx, T: serde::ser::Serialize> serde::ser::Serialize for IndexVec<I, T> {
+    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.vec.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, I: Idx, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> for IndexVec<I, T> {
+    fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Vec::deserialize(deserializer).map(Self::from_vec)
     }
 }

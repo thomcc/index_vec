@@ -18,6 +18,7 @@ example_generated = []
 default = []
 
 [dependencies]
+serde = {version = "1", optional = true}
 
 [package.metadata.docs.rs]
 features = ["example_generated"]
