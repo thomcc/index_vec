@@ -546,6 +546,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     pub unsafe fn from_raw_parts_mut<'a>(data: *mut T, len: usize) -> &'a mut Self {
         Self::new_mut(slice::from_raw_parts_mut(data, len))
     }
+
     /// Returns the first and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
     pub fn split_first(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
@@ -555,6 +556,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
             Some((&self[I::from_usize(0)], &self[I::from_usize(1)..]))
         }
     }
+
     /// Returns the first and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
     pub fn split_first_mut(&mut self) -> Option<(&mut T, &mut IndexSlice<I, [T]>)> {
@@ -565,6 +567,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
             Some((&mut split.0[I::from_usize(0)], split.1))
         }
     }
+
     /// Returns the last and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
     pub fn split_last(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
@@ -575,6 +578,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
             Some((&self[last], &self[..last]))
         }
     }
+
     /// Returns the last and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
     pub fn split_last_mut(&mut self) -> Option<(&mut T, &mut IndexSlice<I, [T]>)> {
@@ -583,7 +587,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
         } else {
             let last = self.last_idx();
             let split = self.split_at_mut(last);
-            Some((&mut split.0[I::from_usize(0)], split.1))
+            Some((&mut split.1[0], split.0))
         }
     }
 }

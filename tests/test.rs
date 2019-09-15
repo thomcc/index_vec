@@ -1,6 +1,6 @@
 #![allow(clippy::assertions_on_constants)]
 
-use index_vec::{index_vec, IndexVec};
+use index_vec::{index_vec, IndexVec, IndexSlice};
 
 index_vec::define_index_type! {
     pub struct USize16 = usize;
@@ -302,4 +302,91 @@ fn test_drain_enumerated() {
     }
     assert!(vec.is_empty());
     assert_eq!(vec2, [1, 2, 3]);
+}
+
+#[test]
+fn test_position() {
+    let b: &IndexSlice<IdxSz, [i32]> = IndexSlice::new(&[1, 2, 3, 5, 5]);
+    assert_eq!(b.position(|&v| v == 9), None);
+    assert_eq!(b.position(|&v| v == 5), Some(IdxSz::from_raw(3)));
+    assert_eq!(b.position(|&v| v == 3), Some(IdxSz::from_raw(2)));
+    assert_eq!(b.position(|&v| v == 0), None);
+}
+
+#[test]
+fn test_rposition() {
+    let b: &IndexSlice<IdxSz, [i32]> = IndexSlice::new(&[1, 2, 3, 5, 5]);
+    assert_eq!(b.rposition(|&v| v == 9), None);
+    assert_eq!(b.rposition(|&v| v == 5), Some(IdxSz::from_raw(4)));
+    assert_eq!(b.rposition(|&v| v == 3), Some(IdxSz::from_raw(2)));
+    assert_eq!(b.rposition(|&v| v == 0), None);
+}
+
+#[test]
+fn test_binary_search() {
+    let b: &IndexSlice<IdxSz, [i32]> = IndexSlice::new(&[]);
+    assert_eq!(b.binary_search(&5), Err(IdxSz::new(0)));
+
+    let b: &IndexSlice<IdxSz, [i32]> = IndexSlice::new(&[4]);
+    assert_eq!(b.binary_search(&3), Err(IdxSz::new(0)));
+    assert_eq!(b.binary_search(&4), Ok(IdxSz::new(0)));
+    assert_eq!(b.binary_search(&5), Err(IdxSz::new(1)));
+}
+
+#[test]
+fn test_chunk_iters() {
+    let mut v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    assert_eq!(v.chunks(3).collect::<Vec<_>>(), &[IndexSlice::new(&[0, 1, 2]), IndexSlice::new(&[3, 4])]);
+    assert_eq!(v.chunks_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [0, 1, 2]), IndexSlice::new_mut(&mut [3, 4])]);
+
+    assert_eq!(v.chunks_exact(3).collect::<Vec<_>>(), &[IndexSlice::new(&[0, 1, 2])]);
+    assert_eq!(v.chunks_exact_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [0, 1, 2])]);
+
+    assert_eq!(v.rchunks(3).collect::<Vec<_>>(), &[IndexSlice::new(&[2, 3, 4]), IndexSlice::new(&[0, 1])]);
+    assert_eq!(v.rchunks_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [2, 3, 4]), IndexSlice::new_mut(&mut [0, 1])]);
+
+    assert_eq!(v.rchunks_exact(3).collect::<Vec<_>>(), &[IndexSlice::new(&[2, 3, 4])]);
+    assert_eq!(v.rchunks_exact_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [2, 3, 4])]);
+    assert_eq!(v.windows(2).collect::<Vec<_>>(), &[
+        IndexSlice::new(&[0, 1]), IndexSlice::new(&[1, 2]), IndexSlice::new(&[2, 3]), IndexSlice::new(&[3, 4])]);
+}
+
+#[test]
+fn test_indexing() {
+    let v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    assert_eq!(v[..], &[0, 1, 2, 3, 4]);
+    assert_eq!(v[IdxSz::new(1)..], &[1, 2, 3, 4]);
+    assert_eq!(v[IdxSz::new(1)..IdxSz::new(3)], &[1, 2]);
+    assert_eq!(v[IdxSz::new(1)..=IdxSz::new(3)], &[1, 2, 3]);
+    assert_eq!(v[..=IdxSz::new(3)], &[0, 1, 2, 3]);
+
+    assert_eq!(v[IdxSz::new(3)], 3);
+
+    assert_eq!(v[3], 3); // usize is allowed.
+}
+
+#[test]
+fn test_splits() {
+    let v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    let (a, b): (&i32, &IndexSlice<IdxSz, [i32]>) = v.split_first().unwrap();
+    assert_eq!(a, &0);
+    assert_eq!(b, &[1, 2, 3, 4]);
+
+    let (a, b): (&i32, &IndexSlice<IdxSz, [i32]>) = v.split_last().unwrap();
+    assert_eq!(a, &4);
+    assert_eq!(b, &[0, 1, 2, 3]);
+    let mut v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    let (a, b): (&mut i32, &mut IndexSlice<IdxSz, [i32]>) = v.split_first_mut().unwrap();
+    assert_eq!(a, &0);
+    assert_eq!(b, &[1, 2, 3, 4]);
+
+    let (a, b): (&mut i32, &mut IndexSlice<IdxSz, [i32]>) = v.split_last_mut().unwrap();
+    assert_eq!(a, &4);
+    assert_eq!(b, &[0, 1, 2, 3]);
+
+    let mut v: IndexVec<IdxSz, i32> = index_vec![];
+    assert!(v.split_first().is_none());
+    assert!(v.split_last().is_none());
+    assert!(v.split_first_mut().is_none());
+    assert!(v.split_last_mut().is_none());
 }
