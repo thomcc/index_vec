@@ -247,3 +247,59 @@ fn test_vec() {
     let new_i = strs.push("quux");
     assert_eq!(strs[new_i], "quux");
 }
+
+#[test]
+fn test_partial_eq() {
+    let i0: IndexVec<Idx32, usize> = index_vec![0];
+    let i1: IndexVec<Idx32, usize> = index_vec![1];
+    let i123: IndexVec<Idx32, usize> = index_vec![1, 2, 3];
+
+    assert_eq!(i0, i0);
+    assert_ne!(i0, i1);
+    assert_eq!(i123, vec![1, 2, 3]);
+    assert_eq!(i123, &[1, 2, 3]);
+    assert_eq!(i123, [1, 2, 3]);
+    assert_eq!(i123[..], [1, 2, 3]);
+    assert_eq!(i123[..Idx32::new(1)], [1usize]);
+    assert_eq!(i123[..Idx32::new(1)], i1.as_slice());
+    assert_eq!(i123[..Idx32::new(1)], i1.as_raw_slice());
+}
+
+#[test]
+fn test_drain() {
+    let mut vec: IndexVec<Idx32, usize> = index_vec![1, 2, 3];
+    let mut vec2: IndexVec<Idx32, usize> = index_vec![];
+    for i in vec.drain(..) {
+        vec2.push(i);
+    }
+    assert!(vec.is_empty());
+    assert_eq!(vec2, [1, 2, 3]);
+
+    let mut vec: IndexVec<Idx32, usize> = index_vec![1, 2, 3];
+    let mut vec2: IndexVec<Idx32, usize> = index_vec![];
+    for i in vec.drain(Idx32::from_raw(1)..) {
+        vec2.push(i);
+    }
+    assert_eq!(vec, [1]);
+    assert_eq!(vec2, [2, 3]);
+
+    let mut vec: IndexVec<Idx32, ()> = index_vec![(), (), ()];
+    let mut vec2: IndexVec<Idx32, ()> = index_vec![];
+    for i in vec.drain(..) {
+        vec2.push(i);
+    }
+    assert_eq!(vec, []);
+    assert_eq!(vec2, [(), (), ()]);
+}
+
+#[test]
+fn test_drain_enumerated() {
+    let mut vec: IndexVec<Idx32, usize> = index_vec![1, 2, 3];
+    let mut vec2: IndexVec<Idx32, usize> = index_vec![];
+    for (i, j) in vec.drain_enumerated(..) {
+        assert_eq!(i.index() + 1, j);
+        vec2.push(j);
+    }
+    assert!(vec.is_empty());
+    assert_eq!(vec2, [1, 2, 3]);
+}

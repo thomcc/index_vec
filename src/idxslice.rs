@@ -2,25 +2,25 @@ use super::*;
 
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct IdxSlice<I: Idx, T: ?Sized> {
-    _boo: PhantomData<fn(&I)>,
-    pub slice: T,
+pub struct IndexSlice<I: Idx, T: ?Sized> {
+    _marker: PhantomData<fn(&I)>,
+    pub raw: T,
 }
 
-unsafe impl<I: Idx, T> Send for IdxSlice<I, T> where T: Send {}
+unsafe impl<I: Idx, T> Send for IndexSlice<I, T> where T: Send {}
 
-impl<I: Idx, T: fmt::Debug + ?Sized> fmt::Debug for IdxSlice<I, T> {
+impl<I: Idx, T: fmt::Debug + ?Sized> fmt::Debug for IndexSlice<I, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.slice, fmt)
+        fmt::Debug::fmt(&self.raw, fmt)
     }
 }
 /// `IndexBox<I, [T]>`: An alias for indexed boxed slice.
-pub type IndexBox<I, T> = Box<IdxSlice<I, T>>;
+pub type IndexBox<I, T> = Box<IndexSlice<I, T>>;
 
-type SliceMapped<Iter, I, T> = iter::Map<Iter, (fn(&[T]) -> &IdxSlice<I, [T]>)>;
-type SliceMappedMut<Iter, I, T> = iter::Map<Iter, (fn(&mut [T]) -> &mut IdxSlice<I, [T]>)>;
+type SliceMapped<Iter, I, T> = iter::Map<Iter, (fn(&[T]) -> &IndexSlice<I, [T]>)>;
+type SliceMappedMut<Iter, I, T> = iter::Map<Iter, (fn(&mut [T]) -> &mut IndexSlice<I, [T]>)>;
 
-impl<I: Idx, T> IdxSlice<I, [T]> {
+impl<I: Idx, T> IndexSlice<I, [T]> {
     /// Construct a new IdxSlice by wrapping an existing slice.
     #[inline]
     pub fn new<S: AsRef<[T]> + ?Sized>(s: &S) -> &Self {
@@ -51,7 +51,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Clone,
     {
-        IndexVec::from_vec(self.slice.to_vec())
+        IndexVec::from_vec(self.raw.to_vec())
     }
 
     /// Converts `self` into a vector without clones or allocation.
@@ -72,25 +72,25 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// Returns the underlying slice.
     #[inline]
     pub fn as_raw_slice_mut(&mut self) -> &mut [T] {
-        &mut self.slice
+        &mut self.raw
     }
 
     /// Returns the underlying slice.
     #[inline]
     pub fn as_raw_slice(&self) -> &[T] {
-        &self.slice
+        &self.raw
     }
 
     /// Returns an unsafe mutable pointer to the slice's buffer.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.slice.as_mut_ptr()
+        self.raw.as_mut_ptr()
     }
 
     /// Returns an unsafe pointer to the slice's buffer.
     #[inline]
     pub fn as_ptr(&self) -> *const T {
-        self.slice.as_ptr()
+        self.raw.as_ptr()
     }
 
     /// Return the index of the last element, or panic.
@@ -105,19 +105,19 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// Returns the length of our slice.
     #[inline]
     pub fn len(&self) -> usize {
-        self.slice.len()
+        self.raw.len()
     }
 
     /// Returns the length of our slice as an `I`.
     #[inline]
     pub fn len_idx(&self) -> I {
-        I::from_usize(self.slice.len())
+        I::from_usize(self.raw.len())
     }
 
     /// Returns true if we're empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.slice.is_empty()
+        self.raw.is_empty()
     }
 
     /// Get a iterator over reverences to our values.
@@ -126,7 +126,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// correct type) as you iterate.
     #[inline]
     pub fn iter(&self) -> slice::Iter<'_, T> {
-        self.slice.iter()
+        self.raw.iter()
     }
 
     /// Get a iterator over mut reverences to our values.
@@ -135,14 +135,14 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// the correct type) as you iterate.
     #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
-        self.slice.iter_mut()
+        self.raw.iter_mut()
     }
 
     /// Similar to `self.iter().enumerate()` but with indices of `I` and not
     /// `usize`.
     #[inline]
     pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
-        self.slice
+        self.raw
             .iter()
             .enumerate()
             .map(|(i, t)| (I::from_usize(i), t))
@@ -158,7 +158,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// `usize`.
     #[inline]
     pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
-        self.slice
+        self.raw
             .iter_mut()
             .enumerate()
             .map(|(i, t)| (I::from_usize(i), t))
@@ -170,19 +170,19 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Ord,
     {
-        self.slice.sort_unstable()
+        self.raw.sort_unstable()
     }
 
     /// Forwards to the slice's `sort_unstable_by` implementation.
     #[inline]
     pub fn sort_unstable_by<F: FnMut(&T, &T) -> core::cmp::Ordering>(&mut self, compare: F) {
-        self.slice.sort_unstable_by(compare)
+        self.raw.sort_unstable_by(compare)
     }
 
     /// Forwards to the slice's `sort_unstable_by_key` implementation.
     #[inline]
     pub fn sort_unstable_by_key<F: FnMut(&T) -> K, K: Ord>(&mut self, f: F) {
-        self.slice.sort_unstable_by_key(f)
+        self.raw.sort_unstable_by_key(f)
     }
 
     /// Forwards to the slice's `ends_with` implementation.
@@ -191,7 +191,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: PartialEq,
     {
-        self.slice.ends_with(needle.as_ref())
+        self.raw.ends_with(needle.as_ref())
     }
 
     /// Forwards to the slice's `starts_with` implementation.
@@ -200,7 +200,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: PartialEq,
     {
-        self.slice.starts_with(needle.as_ref())
+        self.raw.starts_with(needle.as_ref())
     }
 
     /// Forwards to the slice's `contains` implementation.
@@ -209,13 +209,13 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: PartialEq,
     {
-        self.slice.contains(x)
+        self.raw.contains(x)
     }
 
     /// Forwards to the slice's `reverse` implementation.
     #[inline]
     pub fn reverse(&mut self) {
-        self.slice.reverse()
+        self.raw.reverse()
     }
 
     /// Call `slice::binary_search` converting the indices it gives us back as
@@ -225,7 +225,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Ord,
     {
-        match self.slice.binary_search(value) {
+        match self.raw.binary_search(value) {
             Ok(i) => Ok(I::from_usize(i)),
             Err(i) => Err(I::from_usize(i)),
         }
@@ -238,7 +238,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &'a self,
         f: F,
     ) -> Result<I, I> {
-        match self.slice.binary_search_by(f) {
+        match self.raw.binary_search_by(f) {
             Ok(i) => Ok(I::from_usize(i)),
             Err(i) => Err(I::from_usize(i)),
         }
@@ -250,7 +250,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Copy,
     {
-        self.slice.copy_from_slice(&src.slice)
+        self.raw.copy_from_slice(&src.raw)
     }
 
     /// Copies the elements from `src` into `self`.
@@ -259,13 +259,13 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Clone,
     {
-        self.slice.clone_from_slice(&src.slice)
+        self.raw.clone_from_slice(&src.raw)
     }
 
     /// Swaps all elements in `self` with those in `other`.
     #[inline]
     pub fn swap_with_slice(&mut self, other: &mut Self) {
-        self.slice.swap_with_slice(&mut other.slice)
+        self.raw.swap_with_slice(&mut other.raw)
     }
 
     /// Binary searches this sorted vec with a key extraction function, converting
@@ -276,7 +276,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         b: &B,
         f: F,
     ) -> Result<I, I> {
-        match self.slice.binary_search_by_key(b, f) {
+        match self.raw.binary_search_by_key(b, f) {
             Ok(i) => Ok(I::from_usize(i)),
             Err(i) => Err(I::from_usize(i)),
         }
@@ -285,7 +285,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// equivalent to `Iterator::position`, but returns `I` and not `usize`.
     #[inline]
     pub fn position<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
-        self.slice.iter().position(f).map(I::from_usize)
+        self.raw.iter().position(f).map(I::from_usize)
     }
 
     /// Searches for an element in an iterator from the right, returning its
@@ -293,26 +293,26 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// not `usize`.
     #[inline]
     pub fn rposition<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
-        self.slice.iter().rposition(f).map(I::from_usize)
+        self.raw.iter().rposition(f).map(I::from_usize)
     }
 
     /// Swaps two elements in our vector.
     #[inline]
     pub fn swap(&mut self, a: I, b: I) {
-        self.slice.swap(a.index(), b.index())
+        self.raw.swap(a.index(), b.index())
     }
 
     /// Divides our slice into two at an index.
     #[inline]
     pub fn split_at(&self, a: I) -> (&Self, &Self) {
-        let (a, b) = self.slice.split_at(a.index());
+        let (a, b) = self.raw.split_at(a.index());
         (Self::new(a), Self::new(b))
     }
 
     /// Divides our slice into two at an index.
     #[inline]
     pub fn split_at_mut(&mut self, a: I) -> (&mut Self, &mut Self) {
-        let (a, b) = self.slice.split_at_mut(a.index());
+        let (a, b) = self.raw.split_at_mut(a.index());
         (Self::new_mut(a), Self::new_mut(b))
     }
 
@@ -321,7 +321,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// the front
     #[inline]
     pub fn rotate_left(&mut self, mid: I) {
-        self.slice.rotate_left(mid.index())
+        self.raw.rotate_left(mid.index())
     }
 
     /// Rotates our data in-place such that the first `self.len() - k` elements
@@ -329,7 +329,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// front
     #[inline]
     pub fn rotate_right(&mut self, k: I) {
-        self.slice.rotate_right(k.index())
+        self.raw.rotate_right(k.index())
     }
 
     /// Return the the last element, if we are not empty.
@@ -366,7 +366,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     where
         T: Copy,
     {
-        self.slice.copy_within(src.into_range(), dst.index())
+        self.raw.copy_within(src.into_range(), dst.index())
     }
 
     /// Get a ref to the item at the provided index, or None for out of bounds.
@@ -386,28 +386,28 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn windows(&self, size: usize) -> SliceMapped<slice::Windows<'_, T>, I, T> {
-        self.slice.windows(size).map(IdxSlice::new)
+        self.raw.windows(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn chunks(&self, size: usize) -> SliceMapped<slice::Chunks<'_, T>, I, T> {
-        self.slice.chunks(size).map(IdxSlice::new)
+        self.raw.chunks(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks_mut` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn chunks_mut(&mut self, size: usize) -> SliceMappedMut<slice::ChunksMut<'_, T>, I, T> {
-        self.slice.chunks_mut(size).map(IdxSlice::new_mut)
+        self.raw.chunks_mut(size).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `chunks_exact` iterator with one that
     /// yields `IdxSlice`s with the correct index type.
     #[inline]
     pub fn chunks_exact(&self, chunk_size: usize) -> SliceMapped<slice::ChunksExact<'_, T>, I, T> {
-        self.slice.chunks_exact(chunk_size).map(IdxSlice::new)
+        self.raw.chunks_exact(chunk_size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks_exact_mut` iterator with one that
@@ -417,23 +417,23 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &mut self,
         chunk_size: usize,
     ) -> SliceMappedMut<slice::ChunksExactMut<'_, T>, I, T> {
-        self.slice
+        self.raw
             .chunks_exact_mut(chunk_size)
-            .map(IdxSlice::new_mut)
+            .map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `rchunks` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn rchunks(&self, size: usize) -> SliceMapped<slice::RChunks<'_, T>, I, T> {
-        self.slice.rchunks(size).map(IdxSlice::new)
+        self.raw.rchunks(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rchunks_mut` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn rchunks_mut(&mut self, size: usize) -> SliceMappedMut<slice::RChunksMut<'_, T>, I, T> {
-        self.slice.rchunks_mut(size).map(IdxSlice::new_mut)
+        self.raw.rchunks_mut(size).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `rchunks_exact` iterator with one that
@@ -443,7 +443,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &self,
         chunk_size: usize,
     ) -> SliceMapped<slice::RChunksExact<'_, T>, I, T> {
-        self.slice.rchunks_exact(chunk_size).map(IdxSlice::new)
+        self.raw.rchunks_exact(chunk_size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rchunks_exact_mut` iterator with one that
@@ -453,16 +453,16 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &mut self,
         chunk_size: usize,
     ) -> SliceMappedMut<slice::RChunksExactMut<'_, T>, I, T> {
-        self.slice
+        self.raw
             .rchunks_exact_mut(chunk_size)
-            .map(IdxSlice::new_mut)
+            .map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `split` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn split<F: FnMut(&T) -> bool>(&self, f: F) -> SliceMapped<slice::Split<'_, T, F>, I, T> {
-        self.slice.split(f).map(IdxSlice::new)
+        self.raw.split(f).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `split_mut` iterator with one that yields
@@ -472,14 +472,14 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &mut self,
         f: F,
     ) -> SliceMappedMut<slice::SplitMut<'_, T, F>, I, T> {
-        self.slice.split_mut(f).map(IdxSlice::new_mut)
+        self.raw.split_mut(f).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `rsplit` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
     #[inline]
     pub fn rsplit<F: FnMut(&T) -> bool>(&self, f: F) -> SliceMapped<slice::RSplit<'_, T, F>, I, T> {
-        self.slice.rsplit(f).map(IdxSlice::new)
+        self.raw.rsplit(f).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rsplit_mut` iterator with one that yields
@@ -489,7 +489,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         &mut self,
         f: F,
     ) -> SliceMappedMut<slice::RSplitMut<'_, T, F>, I, T> {
-        self.slice.rsplit_mut(f).map(IdxSlice::new_mut)
+        self.raw.rsplit_mut(f).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `splitn` iterator with one that yields
@@ -500,7 +500,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         n: usize,
         f: F,
     ) -> SliceMapped<slice::SplitN<'_, T, F>, I, T> {
-        self.slice.splitn(n, f).map(IdxSlice::new)
+        self.raw.splitn(n, f).map(IndexSlice::new)
     }
     /// Wraps the underlying slice's `splitn_mut` iterator with one that yields
     /// `IdxSlice`s with the correct index type.
@@ -510,7 +510,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         n: usize,
         f: F,
     ) -> SliceMappedMut<slice::SplitNMut<'_, T, F>, I, T> {
-        self.slice.splitn_mut(n, f).map(IdxSlice::new_mut)
+        self.raw.splitn_mut(n, f).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `rsplitn` iterator with one that yields
@@ -521,7 +521,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         n: usize,
         f: F,
     ) -> SliceMapped<slice::RSplitN<'_, T, F>, I, T> {
-        self.slice.rsplitn(n, f).map(IdxSlice::new)
+        self.raw.rsplitn(n, f).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rsplitn_mut` iterator with one that yields
@@ -532,7 +532,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         n: usize,
         f: F,
     ) -> SliceMappedMut<slice::RSplitNMut<'_, T, F>, I, T> {
-        self.slice.rsplitn_mut(n, f).map(IdxSlice::new_mut)
+        self.raw.rsplitn_mut(n, f).map(IndexSlice::new_mut)
     }
 
     /// Create a IdxSlice from its pointer and length.
@@ -548,7 +548,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     }
     /// Returns the first and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_first(&self) -> Option<(&T, &IdxSlice<I, [T]>)> {
+    pub fn split_first(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
         if self.is_empty() {
             None
         } else {
@@ -557,7 +557,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     }
     /// Returns the first and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_first_mut(&mut self) -> Option<(&mut T, &mut IdxSlice<I, [T]>)> {
+    pub fn split_first_mut(&mut self) -> Option<(&mut T, &mut IndexSlice<I, [T]>)> {
         if self.is_empty() {
             None
         } else {
@@ -567,7 +567,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     }
     /// Returns the last and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_last(&self) -> Option<(&T, &IdxSlice<I, [T]>)> {
+    pub fn split_last(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
         if self.is_empty() {
             None
         } else {
@@ -577,7 +577,7 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     }
     /// Returns the last and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_last_mut(&mut self) -> Option<(&mut T, &mut IdxSlice<I, [T]>)> {
+    pub fn split_last_mut(&mut self) -> Option<(&mut T, &mut IndexSlice<I, [T]>)> {
         if self.is_empty() {
             None
         } else {
@@ -588,135 +588,136 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     }
 }
 
-impl<I: Idx, A, B> PartialEq<IdxSlice<I, [B]>> for IdxSlice<I, [A]>
+impl<I: Idx, A, B> PartialEq<IndexSlice<I, [B]>> for IndexSlice<I, [A]>
 where
     A: PartialEq<B>,
 {
     #[inline]
-    fn eq(&self, other: &IdxSlice<I, [B]>) -> bool {
-        PartialEq::eq(&self.slice, &other.slice)
+    fn eq(&self, other: &IndexSlice<I, [B]>) -> bool {
+        PartialEq::eq(&self.raw, &other.raw)
     }
     #[inline]
-    fn ne(&self, other: &IdxSlice<I, [B]>) -> bool {
-        PartialEq::ne(&self.slice, &other.slice)
+    fn ne(&self, other: &IndexSlice<I, [B]>) -> bool {
+        PartialEq::ne(&self.raw, &other.raw)
     }
 }
 
-impl<I: Idx, A: Eq> Eq for IdxSlice<I, [A]> {}
+impl<I: Idx, A: Eq> Eq for IndexSlice<I, [A]> {}
 
-impl<I: Idx, A, B> PartialEq<[B]> for IdxSlice<I, [A]>
+impl<I: Idx, A, B> PartialEq<[B]> for IndexSlice<I, [A]>
 where
     A: PartialEq<B>,
 {
     #[inline]
     fn eq(&self, other: &[B]) -> bool {
-        PartialEq::eq(&self.slice, other)
+        PartialEq::eq(&self.raw, other)
     }
     #[inline]
     fn ne(&self, other: &[B]) -> bool {
-        PartialEq::ne(&self.slice, other)
+        PartialEq::ne(&self.raw, other)
     }
 }
 
-impl<I: Idx, T: PartialOrd> PartialOrd for IdxSlice<I, [T]> {
+impl<I: Idx, T: PartialOrd> PartialOrd for IndexSlice<I, [T]> {
     #[inline]
-    fn partial_cmp(&self, other: &IdxSlice<I, [T]>) -> Option<core::cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.slice, &other.slice)
+    fn partial_cmp(&self, other: &IndexSlice<I, [T]>) -> Option<core::cmp::Ordering> {
+        PartialOrd::partial_cmp(&self.raw, &other.raw)
     }
 }
 
-impl<I: Idx, T: core::cmp::Ord> core::cmp::Ord for IdxSlice<I, [T]> {
+impl<I: Idx, T: core::cmp::Ord> core::cmp::Ord for IndexSlice<I, [T]> {
     #[inline]
-    fn cmp(&self, other: &IdxSlice<I, [T]>) -> core::cmp::Ordering {
-        core::cmp::Ord::cmp(&self.slice, &other.slice)
+    fn cmp(&self, other: &IndexSlice<I, [T]>) -> core::cmp::Ordering {
+        core::cmp::Ord::cmp(&self.raw, &other.raw)
     }
 }
 
-impl<I: Idx, T: core::hash::Hash> core::hash::Hash for IdxSlice<I, [T]> {
+impl<I: Idx, T: core::hash::Hash> core::hash::Hash for IndexSlice<I, [T]> {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
-        self.slice.hash(h)
+        self.raw.hash(h)
     }
 }
 
-impl<I: Idx, T> alloc::borrow::ToOwned for IdxSlice<I, [T]>
+impl<I: Idx, T> alloc::borrow::ToOwned for IndexSlice<I, [T]>
 where
     T: Clone,
 {
     type Owned = IndexVec<I, T>;
     #[inline]
     fn to_owned(&self) -> Self::Owned {
-        IndexVec::from(self.slice.to_vec())
+        IndexVec::from(self.raw.to_vec())
     }
 }
 
-impl<'a, I: Idx, T> IntoIterator for &'a IdxSlice<I, [T]> {
+impl<'a, I: Idx, T> IntoIterator for &'a IndexSlice<I, [T]> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
     #[inline]
     fn into_iter(self) -> slice::Iter<'a, T> {
-        self.slice.iter()
+        self.raw.iter()
     }
 }
 
-impl<'a, I: Idx, T> IntoIterator for &'a mut IdxSlice<I, [T]> {
+impl<'a, I: Idx, T> IntoIterator for &'a mut IndexSlice<I, [T]> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
     #[inline]
     fn into_iter(self) -> slice::IterMut<'a, T> {
-        self.slice.iter_mut()
+        self.raw.iter_mut()
     }
 }
 
-impl<I: Idx, T> Default for &IdxSlice<I, [T]> {
+impl<I: Idx, T> Default for &IndexSlice<I, [T]> {
     fn default() -> Self {
-        IdxSlice::new(&[])
+        IndexSlice::new(&[])
     }
 }
 
-impl<I: Idx, T> Default for &mut IdxSlice<I, [T]> {
+impl<I: Idx, T> Default for &mut IndexSlice<I, [T]> {
     fn default() -> Self {
-        IdxSlice::new_mut(&mut [])
+        IndexSlice::new_mut(&mut [])
     }
 }
 
-impl<'a, I: Idx, T> From<&'a [T]> for &'a IdxSlice<I, [T]> {
+impl<'a, I: Idx, T> From<&'a [T]> for &'a IndexSlice<I, [T]> {
     #[inline]
     fn from(a: &'a [T]) -> Self {
-        IdxSlice::new(a)
+        IndexSlice::new(a)
     }
 }
 
-impl<'a, I: Idx, T> From<&'a mut [T]> for &'a mut IdxSlice<I, [T]> {
+impl<'a, I: Idx, T> From<&'a mut [T]> for &'a mut IndexSlice<I, [T]> {
     #[inline]
     fn from(a: &'a mut [T]) -> Self {
-        IdxSlice::new_mut(a)
+        IndexSlice::new_mut(a)
     }
 }
 
-impl<I: Idx, T> From<Box<[T]>> for Box<IdxSlice<I, [T]>> {
+impl<I: Idx, T> From<Box<[T]>> for Box<IndexSlice<I, [T]>> {
     #[inline]
     fn from(b: Box<[T]>) -> Self {
-        unsafe { Box::from_raw(Box::into_raw(b) as *mut IdxSlice<I, [T]>) }
+        unsafe { Box::from_raw(Box::into_raw(b) as *mut IndexSlice<I, [T]>) }
     }
 }
 
-impl<I: Idx, A> AsRef<[A]> for IdxSlice<I, [A]> {
+impl<I: Idx, A> AsRef<[A]> for IndexSlice<I, [A]> {
     #[inline]
     fn as_ref(&self) -> &[A] {
-        &self.slice
+        &self.raw
     }
 }
 
-impl<I: Idx, A> AsMut<[A]> for IdxSlice<I, [A]> {
+impl<I: Idx, A> AsMut<[A]> for IndexSlice<I, [A]> {
     #[inline]
     fn as_mut(&mut self) -> &mut [A] {
-        &mut self.slice
+        &mut self.raw
     }
 }
-impl<I: Idx, T: Clone> Clone for Box<IdxSlice<I, [T]>> {
+
+impl<I: Idx, T: Clone> Clone for Box<IndexSlice<I, [T]>> {
     #[inline]
     fn clone(&self) -> Self {
         // Suboptimal, I think.
@@ -724,16 +725,16 @@ impl<I: Idx, T: Clone> Clone for Box<IdxSlice<I, [T]>> {
     }
 }
 
-impl<I: Idx, A> FromIterator<A> for Box<IdxSlice<I, [A]>> {
+impl<I: Idx, A> FromIterator<A> for Box<IndexSlice<I, [A]>> {
     #[inline]
     fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
         iter.into_iter().collect::<IndexVec<I, _>>().into_boxed_slice()
     }
 }
 
-impl<I: Idx, A> IntoIterator for Box<IdxSlice<I, [A]>> {
-    type IntoIter = vec::IntoIter<A>;
+impl<I: Idx, A> IntoIterator for Box<IndexSlice<I, [A]>> {
     type Item = A;
+    type IntoIter = vec::IntoIter<A>;
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let v: IndexVec<I, A> = self.into();
@@ -741,7 +742,7 @@ impl<I: Idx, A> IntoIterator for Box<IdxSlice<I, [A]>> {
     }
 }
 
-impl<I: Idx, A> Default for Box<IdxSlice<I, [A]>> {
+impl<I: Idx, A> Default for Box<IndexSlice<I, [A]>> {
     #[inline]
     fn default() -> Self {
         index_vec![].into()
