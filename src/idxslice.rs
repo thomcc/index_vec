@@ -1,6 +1,7 @@
 use super::*;
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct IdxSlice<I: Idx, T: ?Sized> {
     _boo: PhantomData<fn(&I)>,
     pub slice: T,
@@ -13,6 +14,8 @@ impl<I: Idx, T: fmt::Debug + ?Sized> fmt::Debug for IdxSlice<I, T> {
         fmt::Debug::fmt(&self.slice, fmt)
     }
 }
+/// `IndexBox<I, [T]>`: An alias for indexed boxed slice.
+pub type IndexBox<I, T> = Box<IdxSlice<I, T>>;
 
 type SliceMapped<Iter, I, T> = iter::Map<Iter, (fn(&[T]) -> &IdxSlice<I, [T]>)>;
 type SliceMappedMut<Iter, I, T> = iter::Map<Iter, (fn(&mut [T]) -> &mut IdxSlice<I, [T]>)>;
@@ -99,10 +102,16 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
         I::from_usize(self.len() - 1)
     }
 
-    /// Returns the length of our vector.
+    /// Returns the length of our slice.
     #[inline]
     pub fn len(&self) -> usize {
         self.slice.len()
+    }
+
+    /// Returns the length of our slice as an `I`.
+    #[inline]
+    pub fn len_idx(&self) -> I {
+        I::from_usize(self.slice.len())
     }
 
     /// Returns true if we're empty.
@@ -371,23 +380,6 @@ impl<I: Idx, T> IdxSlice<I, [T]> {
     #[inline]
     pub fn get_mut<J: IdxSliceIndex<I, T>>(&mut self, index: J) -> Option<&mut J::Output> {
         index.get_mut(self)
-    }
-
-    /// Returns a reference to an element, without doing bounds checking.
-    ///
-    /// This is generally not recommended, use with caution!
-    #[inline]
-    pub unsafe fn get_unchecked<J: IdxSliceIndex<I, T>>(&self, index: J) -> &J::Output {
-        index.get_unchecked(self)
-    }
-
-    /// Returns a mutable reference to an element or subslice, without doing
-    /// bounds checking.
-    ///
-    /// This is generally not recommended, use with caution!
-    #[inline]
-    pub unsafe fn get_unchecked_mut<J: IdxSliceIndex<I, T>>(&mut self, index: J) -> &mut J::Output {
-        index.get_unchecked_mut(self)
     }
 
     /// Wraps the underlying slice's `windows` iterator with one that yields
@@ -724,3 +716,35 @@ impl<I: Idx, A> AsMut<[A]> for IdxSlice<I, [A]> {
         &mut self.slice
     }
 }
+impl<I: Idx, T: Clone> Clone for Box<IdxSlice<I, [T]>> {
+    #[inline]
+    fn clone(&self) -> Self {
+        // Suboptimal, I think.
+        self.to_vec().clone().into_boxed_slice()
+    }
+}
+
+impl<I: Idx, A> FromIterator<A> for Box<IdxSlice<I, [A]>> {
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+        iter.into_iter().collect::<IndexVec<I, _>>().into_boxed_slice()
+    }
+}
+
+impl<I: Idx, A> IntoIterator for Box<IdxSlice<I, [A]>> {
+    type IntoIter = vec::IntoIter<A>;
+    type Item = A;
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let v: IndexVec<I, A> = self.into();
+        v.into_iter()
+    }
+}
+
+impl<I: Idx, A> Default for Box<IdxSlice<I, [A]>> {
+    #[inline]
+    fn default() -> Self {
+        index_vec![].into()
+    }
+}
+

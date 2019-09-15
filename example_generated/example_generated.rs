@@ -4,13 +4,14 @@
 //! Note that a `cargo expand`ed version of this module (with some slight
 //! cleanup -- e.g. removing all the code that comes from builtin derives) is
 //! checked in to the [repository](https://github.com/thomcc/index_vec), and may
-//! be easier/better to look at..
+//! be easier/better to look at.
+
 /// I'm a doc comment on the type.
 #[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CoolIndex {
     _raw: u32,
 }
+
 impl CoolIndex {
     /// If `Self::CHECKS_MAX_INDEX` is true, we'll assert if trying to
     /// produce a value larger than this in any of the ctors that don't
@@ -150,6 +151,32 @@ impl core::ops::Sub<CoolIndex> for usize {
         CoolIndex::new(self.wrapping_sub(other.index()))
     }
 }
+impl core::ops::Add for CoolIndex {
+    type Output = CoolIndex;
+    #[inline]
+    fn add(self, other: CoolIndex) -> CoolIndex {
+        CoolIndex::new(other.index() + self.index())
+    }
+}
+impl core::ops::Sub for CoolIndex {
+    type Output = CoolIndex;
+    #[inline]
+    fn sub(self, other: CoolIndex) -> CoolIndex {
+        CoolIndex::new(other.index().wrapping_sub(self.index()))
+    }
+}
+impl core::ops::AddAssign for CoolIndex {
+    #[inline]
+    fn add_assign(&mut self, other: CoolIndex) {
+        *self = *self + other
+    }
+}
+impl core::ops::SubAssign for CoolIndex {
+    #[inline]
+    fn sub_assign(&mut self, other: CoolIndex) {
+        *self = *self - other;
+    }
+}
 impl crate::Idx for CoolIndex {
     #[inline]
     fn from_usize(value: usize) -> Self {
@@ -172,6 +199,7 @@ impl From<usize> for CoolIndex {
         CoolIndex::from_usize(value)
     }
 }
+const _: [(); 1] = [(); true as usize];
 impl From<CoolIndex> for u32 {
     #[inline]
     fn from(v: CoolIndex) -> u32 {

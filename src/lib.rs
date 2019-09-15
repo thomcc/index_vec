@@ -103,8 +103,6 @@
 //!
 //! Planned is a bit strong but here are the things I would find useful.
 //!
-//! - Extend the model to include a slice type, which should improve ergonomics
-//!   in some places.
 //! - Support any remaining parts of the slice/vec api.
 //! - Add typesafe wrappers for SmallVec/ArrayVec (behind a cargo `feature`, of
 //!   course).
@@ -135,7 +133,7 @@ use core::ops::Range;
 use core::slice;
 mod idxslice;
 mod indexing;
-pub use idxslice::*;
+pub use idxslice::{IdxSlice, IndexBox};
 pub use indexing::{IdxRangeBounds, IdxSliceIndex};
 
 #[macro_use]
@@ -294,22 +292,6 @@ impl<I: Idx, T> IndexVec<I, T> {
             .map(|(i, t)| (Idx::from_usize(i), t))
     }
 
-    // /// Similar to `self.iter().enumerate()` but with indices of `I` and not
-    // /// `usize`.
-    // #[inline]
-    // pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
-    //     self.vec
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, t)| (Idx::from_usize(i), t))
-    // }
-
-    // /// Get an interator over all our indices.
-    // #[inline]
-    // pub fn indices(&self) -> iter::Map<Range<usize>, fn(usize) -> I> {
-    //     (0..self.len()).map(Idx::from_usize)
-    // }
-
     /// Creates a splicing iterator that replaces the specified range in the
     /// vector with the given `replace_with` iterator and yields the removed
     /// items. See [`Vec::splice`]
@@ -324,16 +306,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     {
         self.vec.splice(range.into_range(), replace_with)
     }
-
-    // /// Similar to `self.iter_mut().enumerate()` but with indices of `I` and not
-    // /// `usize`.
-    // #[inline]
-    // pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
-    //     self.vec
-    //         .iter_mut()
-    //         .enumerate()
-    //         .map(|(i, t)| (Idx::from_usize(i), t))
-    // }
 
     /// Similar to `self.drain(r).enumerate()` but with indices of `I` and not
     /// `usize`.
@@ -354,15 +326,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     pub fn next_idx(&self) -> I {
         I::from_usize(self.len())
     }
-
-    // /// Return the index of the last element, or panic.
-    // #[inline]
-    // pub fn last_idx(&self) -> I {
-    //     // TODO: should this still be a panic even when `I` has disabled
-    //     // checking?
-    //     assert!(!self.is_empty());
-    //     I::from_usize(self.len() - 1)
-    // }
 
     /// Get a the storage as a `&[T]`
     #[inline]
@@ -409,36 +372,6 @@ impl<I: Idx, T> IndexVec<I, T> {
         unsafe { Box::from_raw(Box::into_raw(b) as *mut IdxSlice<I, [T]>) }
     }
 
-    // /// Returns the length of our vector.
-    // #[inline]
-    // pub fn len(&self) -> usize {
-    //     self.vec.len()
-    // }
-
-    // /// Returns true if we're empty.
-    // #[inline]
-    // pub fn is_empty(&self) -> bool {
-    //     self.vec.is_empty()
-    // }
-
-    // /// Get a iterator over reverences to our values.
-    // ///
-    // /// See also [`IndexVec::iter_enumerated`], which gives you indices (of the
-    // /// correct type) as you iterate.
-    // #[inline]
-    // pub fn iter(&self) -> slice::Iter<'_, T> {
-    //     self.vec.iter()
-    // }
-
-    // /// Get a iterator over mut reverences to our values.
-    // ///
-    // /// See also [`IndexVec::iter_mut_enumerated`], which gives you indices (of
-    // /// the correct type) as you iterate.
-    // #[inline]
-    // pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
-    //     self.vec.iter_mut()
-    // }
-
     /// Return an iterator that removes the items from the requested range. See
     /// [`Vec::drain`].
     ///
@@ -448,12 +381,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     pub fn drain<R: IdxRangeBounds<I>>(&mut self, range: R) -> vec::Drain<'_, T> {
         self.vec.drain(range.into_range())
     }
-
-    // /// Return the index of the last element, if we are not empty.
-    // #[inline]
-    // pub fn last(&self) -> Option<I> {
-    //     self.len().checked_sub(1).map(I::from_usize)
-    // }
 
     /// Shrinks the capacity of the vector as much as possible.
     #[inline]
@@ -491,23 +418,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     #[inline]
     pub fn get_mut<J: IdxSliceIndex<I, T>>(&mut self, index: J) -> Option<&mut J::Output> {
         index.get_mut(self.as_mut_slice())
-    }
-
-    /// Returns a reference to an element, without doing bounds checking.
-    ///
-    /// This is generally not recommended, use with caution!
-    #[inline]
-    pub unsafe fn get_unchecked<J: IdxSliceIndex<I, T>>(&self, index: J) -> &J::Output {
-        index.get_unchecked(self.as_slice())
-    }
-
-    /// Returns a mutable reference to an element or subslice, without doing
-    /// bounds checking.
-    ///
-    /// This is generally not recommended, use with caution!
-    #[inline]
-    pub unsafe fn get_unchecked_mut<J: IdxSliceIndex<I, T>>(&mut self, index: J) -> &mut J::Output {
-        index.get_unchecked_mut(self.as_mut_slice())
     }
 
     /// Resize ourselves in-place to `new_len`. See [`Vec::resize`].
@@ -558,105 +468,6 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.vec.insert(index.index(), element)
     }
 
-    // /// Searches for an element in an iterator, returning its index. This is
-    // /// equivalent to `Iterator::position`, but returns `I` and not `usize`.
-    // #[inline]
-    // pub fn position<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
-    //     self.vec.iter().position(f).map(Idx::from_usize)
-    // }
-
-    // /// Searches for an element in an iterator from the right, returning its
-    // /// index. This is equivalent to `Iterator::position`, but returns `I` and
-    // /// not `usize`.
-    // #[inline]
-    // pub fn rposition<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
-    //     self.vec.iter().rposition(f).map(Idx::from_usize)
-    // }
-
-    // /// Swaps two elements in our vector.
-    // #[inline]
-    // pub fn swap(&mut self, a: I, b: I) {
-    //     self.vec.swap(a.index(), b.index())
-    // }
-
-    // /// Divides our slice into two at an index.
-    // #[inline]
-    // pub fn split_at(&self, a: I) -> (&[T], &[T]) {
-    //     self.vec.split_at(a.index())
-    // }
-
-    // /// Divides our slice into two at an index.
-    // #[inline]
-    // pub fn split_at_mut(&mut self, a: I) -> (&mut [T], &mut [T]) {
-    //     self.vec.split_at_mut(a.index())
-    // }
-
-    // /// Rotates our data in-place such that the first `mid` elements of the
-    // /// slice move to the end while the last `self.len() - mid` elements move to
-    // /// the front
-    // #[inline]
-    // pub fn rotate_left(&mut self, mid: I) {
-    //     self.vec.rotate_left(mid.index())
-    // }
-
-    // /// Rotates our data in-place such that the first `self.len() - k` elements
-    // /// of the slice move to the end while the last `k` elements move to the
-    // /// front
-    // #[inline]
-    // pub fn rotate_right(&mut self, k: I) {
-    //     self.vec.rotate_right(k.index())
-    // }
-
-    // /// Copies elements from one part of the slice to another part of itself,
-    // /// using a memmove.
-    // #[inline]
-    // pub fn copy_within<R: IdxRangeBounds<I>>(&mut self, src: R, dst: I)
-    // where
-    //     T: Copy,
-    // {
-    //     self.vec.copy_within(src.into_range(), dst.index())
-    // }
-
-    // /// Call `slice::binary_search` converting the indices it gives us back as
-    // /// needed.
-    // #[inline]
-    // pub fn binary_search(&self, value: &T) -> Result<I, I>
-    // where
-    //     T: Ord,
-    // {
-    //     match self.vec.binary_search(value) {
-    //         Ok(i) => Ok(Idx::from_usize(i)),
-    //         Err(i) => Err(Idx::from_usize(i)),
-    //     }
-    // }
-
-    // /// Binary searches this sorted vec with a comparator function, converting
-    // /// the indices it gives us back to our Idx type.
-    // #[inline]
-    // pub fn binary_search_by<'a, F: FnMut(&'a T) -> core::cmp::Ordering>(
-    //     &'a self,
-    //     f: F,
-    // ) -> Result<I, I> {
-    //     match self.vec.binary_search_by(f) {
-    //         Ok(i) => Ok(Idx::from_usize(i)),
-    //         Err(i) => Err(Idx::from_usize(i)),
-    //     }
-    // }
-
-    // /// Binary searches this sorted vec with a key extraction function, converting
-    // /// the indices it gives us back to our Idx type.
-    // #[inline]
-    // pub fn binary_search_by_key<'a, B: Ord, F: FnMut(&'a T) -> B>(
-    //     &'a self,
-    //     b: &B,
-    //     f: F,
-    // ) -> Result<I, I> {
-    //     match self.vec.binary_search_by_key(b, f) {
-    //         Ok(i) => Ok(Idx::from_usize(i)),
-    //         Err(i) => Err(Idx::from_usize(i)),
-    //     }
-    // }
-
     /// Append all items in the slice to the end of our vector.
     ///
     /// See [`Vec::extend_from_slice`].
@@ -667,54 +478,6 @@ impl<I: Idx, T> IndexVec<I, T> {
     {
         self.vec.extend_from_slice(&other.slice)
     }
-
-    // /// Forwards to the `Vec::sort_unstable` implementation.
-    // #[inline]
-    // pub fn sort_unstable(&mut self)
-    // where
-    //     T: Ord,
-    // {
-    //     self.vec.sort_unstable()
-    // }
-
-    // /// Forwards to the `Vec::sort_unstable_by` implementation.
-    // #[inline]
-    // pub fn sort_unstable_by<F: FnMut(&T, &T) -> core::cmp::Ordering>(&mut self, compare: F) {
-    //     self.vec.sort_unstable_by(compare)
-    // }
-
-    // /// Forwards to the `Vec::sort_unstable_by_key` implementation.
-    // #[inline]
-    // pub fn sort_unstable_by_key<F: FnMut(&T) -> K, K: Ord>(&mut self, f: F) {
-    //     self.vec.sort_unstable_by_key(f)
-    // }
-
-    // /// Forwards to the `Vec::ends_with` implementation.
-    // #[inline]
-    // pub fn ends_with(&self, needle: &[T]) -> bool
-    // where
-    //     T: PartialEq,
-    // {
-    //     self.vec.ends_with(needle)
-    // }
-
-    // /// Forwards to the `Vec::starts_with` implementation.
-    // #[inline]
-    // pub fn starts_with(&self, needle: &[T]) -> bool
-    // where
-    //     T: PartialEq,
-    // {
-    //     self.vec.starts_with(needle)
-    // }
-
-    // /// Forwards to the `Vec::contains` implementation.
-    // #[inline]
-    // pub fn contains(&self, x: &T) -> bool
-    // where
-    //     T: PartialEq,
-    // {
-    //     self.vec.contains(x)
-    // }
 
     /// Forwards to the `Vec::retain` implementation.
     #[inline]

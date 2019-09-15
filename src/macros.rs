@@ -73,8 +73,8 @@
 ///
 /// For the sake of clarity, disabling this cannot lead to memory unsafety -- we
 /// still go through bounds checks when accessing slices, and no unsafe code
-/// (unless you write some, and don't! only use this for correctness!) should
-/// rely on on these checks.
+/// should rely on on these checks (unless you write some, and don't! only use
+/// this for correctness!).
 ///
 /// #### `DEFAULT = <expr>;`
 /// If provided, we'll implement `Default` for the index type using this
@@ -523,6 +523,36 @@ macro_rules! __define_index_type_inner {
             #[inline]
             fn sub(self, other: $type) -> $type {
                 $type::new(self.wrapping_sub(other.index()))
+            }
+        }
+
+        impl core::ops::Add for $type {
+            type Output = $type;
+            #[inline]
+            fn add(self, other: $type) -> $type {
+                $type::new(other.index() + self.index())
+            }
+        }
+
+        impl core::ops::Sub for $type {
+            type Output = $type;
+            #[inline]
+            fn sub(self, other: $type) -> $type {
+                $type::new(other.index().wrapping_sub(self.index()))
+            }
+        }
+
+        impl core::ops::AddAssign for $type {
+            #[inline]
+            fn add_assign(&mut self, other: $type) {
+                *self = *self + other
+            }
+        }
+
+        impl core::ops::SubAssign for $type {
+            #[inline]
+            fn sub_assign(&mut self, other: $type) {
+                *self = *self - other;
             }
         }
 

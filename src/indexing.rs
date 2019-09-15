@@ -13,9 +13,6 @@ pub trait IdxSliceIndex<I: Idx, T>: private_slice_index::Sealed {
     fn get(self, slice: &IdxSlice<I, [T]>) -> Option<&Self::Output>;
     fn get_mut(self, slice: &mut IdxSlice<I, [T]>) -> Option<&mut Self::Output>;
 
-    unsafe fn get_unchecked(self, slice: &IdxSlice<I, [T]>) -> &Self::Output;
-    unsafe fn get_unchecked_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output;
-
     fn index(self, slice: &IdxSlice<I, [T]>) -> &Self::Output;
     fn index_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output;
 }
@@ -33,16 +30,6 @@ impl<I: Idx, T> IdxSliceIndex<I, T> for I {
     #[inline]
     fn get_mut(self, slice: &mut IdxSlice<I, [T]>) -> Option<&mut Self::Output> {
         slice.slice.get_mut(self.index())
-    }
-
-    #[inline]
-    unsafe fn get_unchecked(self, slice: &IdxSlice<I, [T]>) -> &Self::Output {
-        slice.slice.get_unchecked(self.index())
-    }
-
-    #[inline]
-    unsafe fn get_unchecked_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output {
-        slice.slice.get_unchecked_mut(self.index())
     }
 
     #[inline]
@@ -71,16 +58,6 @@ macro_rules! range_slice {
                     .slice
                     .get_mut(self.into_range())
                     .map(IdxSlice::new_mut)
-            }
-
-            #[inline]
-            unsafe fn get_unchecked(self, slice: &IdxSlice<I, [T]>) -> &Self::Output {
-                IdxSlice::new(slice.slice.get_unchecked(self.into_range()))
-            }
-
-            #[inline]
-            unsafe fn get_unchecked_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output {
-                IdxSlice::new_mut(slice.slice.get_unchecked_mut(self.into_range()))
             }
 
             #[inline]
@@ -122,16 +99,6 @@ impl<I: Idx, T> IdxSliceIndex<I, T> for core::ops::RangeFull {
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: &IdxSlice<I, [T]>) -> &Self::Output {
-        slice
-    }
-
-    #[inline]
-    unsafe fn get_unchecked_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output {
-        slice
-    }
-
-    #[inline]
     fn index(self, slice: &IdxSlice<I, [T]>) -> &Self::Output {
         slice
     }
@@ -154,16 +121,6 @@ impl<I: Idx, T> IdxSliceIndex<I, T> for usize {
     #[inline]
     fn get_mut(self, slice: &mut IdxSlice<I, [T]>) -> Option<&mut Self::Output> {
         slice.slice.get_mut(self)
-    }
-
-    #[inline]
-    unsafe fn get_unchecked(self, slice: &IdxSlice<I, [T]>) -> &Self::Output {
-        slice.slice.get_unchecked(self)
-    }
-
-    #[inline]
-    unsafe fn get_unchecked_mut(self, slice: &mut IdxSlice<I, [T]>) -> &mut Self::Output {
-        slice.slice.get_unchecked_mut(self)
     }
 
     #[inline]
@@ -271,53 +228,3 @@ where
         index.index_mut(self)
     }
 }
-
-// impl<I, R, T> core::ops::Index<R> for crate::IndexVec<I, T>
-// where
-//     I: Idx,
-//     R: IdxSliceIndex<I, T>
-// {
-//     type Output = R::Output;
-//     #[inline]
-//     fn index(&self, index: R) -> &R::Output {
-//         index.index(self.as_slice())
-//     }
-// }
-
-// impl<I, R, T> core::ops::IndexMut<R> for crate::IndexVec<I, T>
-// where
-//     I: Idx,
-//     R: IdxSliceIndex<I, T>
-// {
-//     #[inline]
-//     fn index_mut(&mut self, index: R) -> &mut R::Output {
-//         index.index_mut(self.as_slice_mut())
-//     }
-// }
-
-// macro_rules! impl_index {
-//     ($index_type: ty, $output_type: ty, |$r:ident| $e:expr) => {
-//         impl<I: Idx, T> core::ops::Index<$index_type> for core::ops::IndexVec<I, T> {
-//             type Output = $output_type;
-//             #[inline]
-//             fn index(&self, $r: $index_type) -> &$output_type {
-//                 &self.as_slice()[$e]
-//             }
-//         }
-
-//         impl<I: Idx, T> core::ops::IndexMut<$index_type> for core::ops::IndexVec<I, T> {
-//             #[inline]
-//             fn index_mut(&mut self, $r: $index_type) -> &mut $output_type {
-//                 &mut self.as_mut_slice()[$e]
-//             }
-//         }
-//     };
-// }
-
-// impl_index!(I, T, |r| r.index());
-// impl_index!(core::ops::Range<I>, [T], |r| r.into_range());
-// impl_index!(core::ops::RangeFrom<I>, [T], |r| r.into_range());
-// impl_index!(core::ops::RangeTo<I>, [T], |r| r.into_range());
-// impl_index!(core::ops::RangeFull, [T], |r| r);
-// impl_index!(core::ops::RangeInclusive<I>, [T], |r| r.into_range());
-// impl_index!(core::ops::RangeToInclusive<I>, [T], |r| r.into_range());
