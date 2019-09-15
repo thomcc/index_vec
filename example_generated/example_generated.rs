@@ -8,6 +8,7 @@
 
 /// I'm a doc comment on the type.
 #[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CoolIndex {
     _raw: u32,
 }
@@ -21,27 +22,27 @@ impl CoolIndex {
     /// larger than MAX_INDEX?
     pub const CHECKS_MAX_INDEX: bool = !false;
     /// Construct this index type from a usize. Alias for `from_usize`.
-    #[inline]
+    #[inline(always)]
     pub fn new(value: usize) -> Self {
         Self::from_usize(value)
     }
     /// Construct this index type from the wrapped integer type.
-    #[inline]
+    #[inline(always)]
     pub fn from_raw(value: u32) -> Self {
         Self::from_usize(value as usize)
     }
     /// Construct this index type from one in a different domain
-    #[inline]
+    #[inline(always)]
     pub fn from_foreign<F: crate::Idx>(value: F) -> Self {
         Self::from_usize(value.index())
     }
     /// Construct from a usize without any checks.
-    #[inline]
+    #[inline(always)]
     pub const fn from_usize_unchecked(value: usize) -> Self {
         Self { _raw: value as u32 }
     }
     /// Construct from the underlying type without any checks.
-    #[inline]
+    #[inline(always)]
     pub const fn from_raw_unchecked(raw: u32) -> Self {
         Self { _raw: raw }
     }
@@ -52,12 +53,12 @@ impl CoolIndex {
         Self { _raw: value as u32 }
     }
     /// Get the wrapped index as a usize.
-    #[inline]
+    #[inline(always)]
     pub fn index(self) -> usize {
         self._raw as usize
     }
     /// Get the wrapped index.
-    #[inline]
+    #[inline(always)]
     pub fn raw(self) -> u32 {
         self._raw
     }

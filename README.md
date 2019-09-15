@@ -9,7 +9,7 @@ gained at zero cost.
 
 ## Example / Overview
 ```rust
-use index_vec::{IndexVec, index_vec};
+use index_vec::{IndexVec, IndexSlice, index_vec};
 
 index_vec::define_index_type! {
     // Define StrIdx to use only 32 bits internally (you can use usize, u16,
@@ -44,6 +44,10 @@ assert_eq!(strs[l], "baz");
 let new_i = strs.push("quux");
 assert_eq!(strs[new_i], "quux");
 
+// The slice APIs are wrapped as well.
+let s: &IndexSlice<StrIdx, [&'static str]> = &strs[StrIdx::new(1)..];
+assert_eq!(s[0], "bar");
+
 // Indices are mostly interoperable with `usize`, and support
 // a lot of what you might want to do to an index.
 
@@ -51,13 +55,13 @@ assert_eq!(strs[new_i], "quux");
 assert_eq!(StrIdx::new(0), 0usize);
 
 // Addition
-assert_eq!(StrIdx::new(0) + 1, 1usize);
+assert_eq!(StrIdx::new(0) + 1, StrIdx::new(1));
 
 // Subtraction
-assert_eq!(StrIdx::new(1) - 1, 0usize);
+assert_eq!(StrIdx::new(1) - 1, StrIdx::new(0));
 
 // Wrapping
-assert_eq!(StrIdx::new(5) % strs.len(), 1usize);
+assert_eq!(StrIdx::new(5) % strs.len(), StrIdx::new(1));
 // ...
 ```
 ## Background
@@ -106,14 +110,16 @@ I'm open to suggestions.
 
 #### Does it support no_std?
 
-Yes, but it uses `extern crate alloc;`.
+Yes, although it uses `extern crate alloc;`, of course.
+
+#### Does it support serde?
+
+Yes, but only if you turn on the `serde` feature.
 
 #### What features are planned?
 
 Planned is a bit strong but here are the things I would find useful.
 
-- Extend the model to include a slice type, which should improve ergonomics
-  in some places.
 - Support any remaining parts of the slice/vec api.
 - Add typesafe wrappers for SmallVec/ArrayVec (behind a cargo `feature`, of
   course).

@@ -373,31 +373,31 @@ macro_rules! __define_index_type_inner {
             $v const CHECKS_MAX_INDEX: bool = !$no_check_max;
 
             /// Construct this index type from a usize. Alias for `from_usize`.
-            #[inline]
+            #[inline(always)]
             $v fn new(value: usize) -> Self {
                 Self::from_usize(value)
             }
 
             /// Construct this index type from the wrapped integer type.
-            #[inline]
+            #[inline(always)]
             $v fn from_raw(value: $raw) -> Self {
                 Self::from_usize(value as usize)
             }
 
             /// Construct this index type from one in a different domain
-            #[inline]
+            #[inline(always)]
             $v fn from_foreign<F: $crate::Idx>(value: F) -> Self {
                 Self::from_usize(value.index())
             }
 
             /// Construct from a usize without any checks.
-            #[inline]
+            #[inline(always)]
             $v const fn from_usize_unchecked(value: usize) -> Self {
                 Self { _raw: value as $raw }
             }
 
             /// Construct from the underlying type without any checks.
-            #[inline]
+            #[inline(always)]
             $v const fn from_raw_unchecked(raw: $raw) -> Self {
                 Self { _raw: raw }
             }
@@ -410,13 +410,13 @@ macro_rules! __define_index_type_inner {
             }
 
             /// Get the wrapped index as a usize.
-            #[inline]
+            #[inline(always)]
             $v fn index(self) -> usize {
                 self._raw as usize
             }
 
             /// Get the wrapped index.
-            #[inline]
+            #[inline(always)]
             $v fn raw(self) -> $raw {
                 self._raw
             }

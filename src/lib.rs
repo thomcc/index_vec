@@ -1,10 +1,10 @@
 //! This crate helps with defining "newtype"-style wrappers around `usize` (or
-//! other integers), and `Vec<T>` so that some additional type safety can be
-//! gained at zero cost.
+//! other integers), `Vec<T>`, and `[T]` so that some additional type safety can
+//! be gained at zero cost.
 //!
 //! ## Example / Overview
 //! ```rust
-//! use index_vec::{IndexVec, index_vec};
+//! use index_vec::{IndexVec, IndexSlice, index_vec};
 //!
 //! index_vec::define_index_type! {
 //!     // Define StrIdx to use only 32 bits internally (you can use usize, u16,
@@ -38,6 +38,10 @@
 //!
 //! let new_i = strs.push("quux");
 //! assert_eq!(strs[new_i], "quux");
+//!
+//! // The slice APIs are wrapped as well.
+//! let s: &IndexSlice<StrIdx, [&'static str]> = &strs[StrIdx::new(1)..];
+//! assert_eq!(s[0], "bar");
 //!
 //! // Indices are mostly interoperable with `usize`, and support
 //! // a lot of what you might want to do to an index.
@@ -99,6 +103,14 @@
 //!
 //! I'm open to suggestions.
 //!
+//! #### Does it support no_std?
+//!
+//! Yes, although it uses `extern crate alloc;`, of course.
+//!
+//! #### Does it support serde?
+//!
+//! Yes, but only if you turn on the `serde` feature.
+//!
 //! #### What features are planned?
 //!
 //! Planned is a bit strong but here are the things I would find useful.
@@ -133,7 +145,7 @@ use core::ops::Range;
 use core::slice;
 mod idxslice;
 mod indexing;
-pub use idxslice::{IndexSlice, IndexBox};
+pub use idxslice::{IndexBox, IndexSlice};
 pub use indexing::{IdxRangeBounds, IdxSliceIndex};
 
 #[macro_use]
@@ -198,53 +210,16 @@ macro_rules! index_box {
 /// not a complete mirror of Vec's (patches welcome). In the worst case, you can
 /// always do what you need to the Vec itself.
 ///
-/// ## Some notes on the APIs
+/// Note that this implements Deref/DerefMut to [`IndexSlice`], and so all the
+/// methods on IndexSlice are available as well. See it's documentation for some
+/// further information.
 ///
-/// - Most of the Vec/Slice APIs are present.
-///     - Any that aren't can be trivially accessed on the underlying `raw`
-///       field, which is public.
-///     - Most of the ones that aren't re-exposed I'm still thinking about, I
-///       belive I got the obvious ones.
+/// The following extensions to the Vec APIs are added (in addition to the ones
+/// mentioned in IndexSlice's documentation):
 ///
-/// - Apis that take or return usizes referring to the positions of items were
-///   replaced with ones that take Idx.
-///
-/// - Apis that take `R: RangeBounds<usize>` take an
-///   [`IdxRangeBounds<I>`][IdxRangeBounds], which is basically a
-///   `RangeBounds<I>`.
-///
-/// - Most iterator functions where `the_iter().enumerate()` would refer to
-///   indices have been given `_enumerated` variants. E.g.
-///   [`IndexVec::iter_enumerated`], [`IndexVec::drain_enumerated`], etc. This
-///   is because `v.iter().enumerate()` would be `(usize, &T)`, but you want
-///   `(I, &T)`.
-///
-/// ## APIs not present on `Vec<T>` or `[T]`
-///
-/// The following extensions are added:
-///
-/// - [`IndexVec::indices`]: an Iterator over the indices of type `I`.
-/// - [`IndexVec::next_idx`], [`IndexVec::last_idx`] give the next and most
+/// - [`IndexVec::next_idx`], [`IndexSlice::last_idx`] give the next and most
 ///   recent index returned by `push`.
 /// - [`IndexVec::push`] returns the index the item was inserted at.
-/// - Various `enumerated` iterators mentioned earlier
-/// - [`IndexVec::position`], [`IndexVec::rposition`] as
-///   `self.iter().position()` will return a `Option<usize>`
-///
-/// ## Pitfalls / Gotchas
-///
-/// - `IndexVec<I, T>` is not `Deref<Target = [T]>`. This means it does not
-///   auto-coerce into &[T] when needed. I think this is for the best, but could
-///   probably be convinced otherwise.
-///
-///   At the moment, we attempt to make up for this by wrapping the bulk of the
-///   API for slices as well, but still. Note that you still can access the vec
-///   directly whenever you need.
-///
-/// - `get_unchecked`/`get_unchecked_mut` is intentionally not present, as the
-///   behavior on overflow when max index checks are disabled could be
-///   confusing. You should instead just use the method on the `raw` field
-///   directly.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IndexVec<I: Idx, T> {
     /// Our wrapped Vec.
@@ -298,7 +273,7 @@ impl<I: Idx, T> IndexVec<I, T> {
 
     /// Similar to `self.into_iter().enumerate()` but with indices of `I` and
     /// not `usize`.
-    #[inline]
+    #[inline(always)]
     pub fn into_iter_enumerated(self) -> Enumerated<vec::IntoIter<T>, I, T> {
         self.raw
             .into_iter()
@@ -309,6 +284,7 @@ impl<I: Idx, T> IndexVec<I, T> {
     /// Creates a splicing iterator that replaces the specified range in the
     /// vector with the given `replace_with` iterator and yields the removed
     /// items. See [`Vec::splice`]
+    #[inline]
     pub fn splice<R, It>(
         &mut self,
         range: R,
@@ -342,26 +318,26 @@ impl<I: Idx, T> IndexVec<I, T> {
     }
 
     /// Get a the storage as a `&[T]`
-    #[inline]
+    #[inline(always)]
     pub fn as_raw_slice(&self) -> &[T] {
         &self.raw
     }
 
     /// Get a the storage as a `&mut [T]`
-    #[inline]
+    #[inline(always)]
     pub fn as_raw_slice_mut(&mut self) -> &mut [T] {
         &mut self.raw
     }
 
     /// Equivalent to accessing our `raw` field, but as a function.
-    #[inline]
+    #[inline(always)]
     pub fn as_vec(&self) -> &Vec<T> {
         &self.raw
     }
 
     /// Equivalent to accessing our `raw` field mutably, but as a function, if
     /// that's what you'd prefer.
-    #[inline]
+    #[inline(always)]
     pub fn as_mut_vec(&mut self) -> &mut Vec<T> {
         &mut self.raw
     }
@@ -381,6 +357,7 @@ impl<I: Idx, T> IndexVec<I, T> {
     }
 
     /// Converts the vector into an owned IdxSlice, dropping excess capacity.
+    #[inline]
     pub fn into_boxed_slice(self) -> alloc::boxed::Box<IndexSlice<I, [T]>> {
         let b = self.raw.into_boxed_slice();
         unsafe { Box::from_raw(Box::into_raw(b) as *mut IndexSlice<I, [T]>) }
@@ -520,20 +497,16 @@ impl<I: Idx, T> IndexVec<I, T> {
         self.raw.dedup_by(same_bucket)
     }
 
-    /// Forwards to the `Vec::reverse` implementation.
-    #[inline]
-    pub fn reverse(&mut self) {
-        self.raw.reverse()
-    }
-
-    /// Get a IdxSlice over this vector.
-    #[inline]
+    /// Get a IndexSlice over this vector. See `as_raw_slice` for converting to
+    /// a `&[T]` (or access `self.raw`).
+    #[inline(always)]
     pub fn as_slice(&self) -> &IndexSlice<I, [T]> {
         IndexSlice::new(&self.raw)
     }
 
-    /// Get a mutable IdxSlice over this vector.
-    #[inline]
+    /// Get a mutable IndexSlice over this vector. See `as_raw_slice_mut` for
+    /// converting to a `&mut [T]` (or access `self.raw`).
+    #[inline(always)]
     pub fn as_mut_slice(&mut self) -> &mut IndexSlice<I, [T]> {
         IndexSlice::new_mut(&mut self.raw)
     }
@@ -621,6 +594,7 @@ impl<'a, I: Idx, T> From<Cow<'a, IndexSlice<I, [T]>>> for IndexVec<I, T>
 where
     IndexSlice<I, [T]>: ToOwned<Owned = IndexVec<I, T>>,
 {
+    #[inline]
     fn from(s: Cow<'a, IndexSlice<I, [T]>>) -> IndexVec<I, T> {
         s.into_owned()
     }
@@ -830,4 +804,3 @@ impl<'de, I: Idx, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> fo
         Box::<[T]>::deserialize(deserializer).map(Into::into)
     }
 }
-

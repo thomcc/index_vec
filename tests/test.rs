@@ -1,6 +1,6 @@
 #![allow(clippy::assertions_on_constants)]
 
-use index_vec::{index_vec, IndexVec, IndexSlice};
+use index_vec::{index_vec, IndexSlice, IndexVec};
 
 index_vec::define_index_type! {
     pub struct USize16 = usize;
@@ -336,19 +336,56 @@ fn test_binary_search() {
 #[test]
 fn test_chunk_iters() {
     let mut v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
-    assert_eq!(v.chunks(3).collect::<Vec<_>>(), &[IndexSlice::new(&[0, 1, 2]), IndexSlice::new(&[3, 4])]);
-    assert_eq!(v.chunks_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [0, 1, 2]), IndexSlice::new_mut(&mut [3, 4])]);
+    assert_eq!(
+        v.chunks(3).collect::<Vec<_>>(),
+        &[IndexSlice::new(&[0, 1, 2]), IndexSlice::new(&[3, 4])]
+    );
+    assert_eq!(
+        v.chunks_mut(3).collect::<Vec<_>>(),
+        &[
+            IndexSlice::new_mut(&mut [0, 1, 2]),
+            IndexSlice::new_mut(&mut [3, 4])
+        ]
+    );
 
-    assert_eq!(v.chunks_exact(3).collect::<Vec<_>>(), &[IndexSlice::new(&[0, 1, 2])]);
-    assert_eq!(v.chunks_exact_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [0, 1, 2])]);
+    assert_eq!(
+        v.chunks_exact(3).collect::<Vec<_>>(),
+        &[IndexSlice::new(&[0, 1, 2])]
+    );
+    assert_eq!(
+        v.chunks_exact_mut(3).collect::<Vec<_>>(),
+        &[IndexSlice::new_mut(&mut [0, 1, 2])]
+    );
 
-    assert_eq!(v.rchunks(3).collect::<Vec<_>>(), &[IndexSlice::new(&[2, 3, 4]), IndexSlice::new(&[0, 1])]);
-    assert_eq!(v.rchunks_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [2, 3, 4]), IndexSlice::new_mut(&mut [0, 1])]);
+    assert_eq!(
+        v.rchunks(3).collect::<Vec<_>>(),
+        &[IndexSlice::new(&[2, 3, 4]), IndexSlice::new(&[0, 1])]
+    );
+    assert_eq!(
+        v.rchunks_mut(3).collect::<Vec<_>>(),
+        &[
+            IndexSlice::new_mut(&mut [2, 3, 4]),
+            IndexSlice::new_mut(&mut [0, 1])
+        ]
+    );
 
-    assert_eq!(v.rchunks_exact(3).collect::<Vec<_>>(), &[IndexSlice::new(&[2, 3, 4])]);
-    assert_eq!(v.rchunks_exact_mut(3).collect::<Vec<_>>(), &[IndexSlice::new_mut(&mut [2, 3, 4])]);
-    assert_eq!(v.windows(2).collect::<Vec<_>>(), &[
-        IndexSlice::new(&[0, 1]), IndexSlice::new(&[1, 2]), IndexSlice::new(&[2, 3]), IndexSlice::new(&[3, 4])]);
+    assert_eq!(
+        v.rchunks_exact(3).collect::<Vec<_>>(),
+        &[IndexSlice::new(&[2, 3, 4])]
+    );
+    assert_eq!(
+        v.rchunks_exact_mut(3).collect::<Vec<_>>(),
+        &[IndexSlice::new_mut(&mut [2, 3, 4])]
+    );
+    assert_eq!(
+        v.windows(2).collect::<Vec<_>>(),
+        &[
+            IndexSlice::new(&[0, 1]),
+            IndexSlice::new(&[1, 2]),
+            IndexSlice::new(&[2, 3]),
+            IndexSlice::new(&[3, 4])
+        ]
+    );
 }
 
 #[test]
@@ -363,6 +400,80 @@ fn test_indexing() {
     assert_eq!(v[IdxSz::new(3)], 3);
 
     assert_eq!(v[3], 3); // usize is allowed.
+
+    // Make sure the types are as expected
+    let s: &IndexSlice<IdxSz, [i32]> = &v[..];
+    assert_eq!(s, &[0, 1, 2, 3, 4]);
+    let s: &IndexSlice<IdxSz, [i32]> = &v[IdxSz::new(1)..];
+    assert_eq!(s, &[1, 2, 3, 4]);
+    let s: &IndexSlice<IdxSz, [i32]> = &v[IdxSz::new(1)..IdxSz::new(3)];
+    assert_eq!(s, &[1, 2]);
+    let s: &IndexSlice<IdxSz, [i32]> = &v[IdxSz::new(1)..=IdxSz::new(3)];
+    assert_eq!(s, &[1, 2, 3]);
+    let s: &IndexSlice<IdxSz, [i32]> = &v[..=IdxSz::new(3)];
+    assert_eq!(s, &[0, 1, 2, 3]);
+
+    let mut v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    // check `IndexMut`
+    {
+        let s: &mut IndexSlice<IdxSz, [i32]> = &mut v[..];
+        assert_eq!(s, &[0, 1, 2, 3, 4]);
+    }
+    {
+        let s: &mut IndexSlice<IdxSz, [i32]> = &mut v[IdxSz::new(1)..];
+        assert_eq!(s, &[1, 2, 3, 4]);
+    }
+    {
+        let s: &mut IndexSlice<IdxSz, [i32]> = &mut v[IdxSz::new(1)..IdxSz::new(3)];
+        assert_eq!(s, &[1, 2]);
+    }
+    {
+        let s: &mut IndexSlice<IdxSz, [i32]> = &mut v[IdxSz::new(1)..=IdxSz::new(3)];
+        assert_eq!(s, &[1, 2, 3]);
+    }
+    {
+        let s: &mut IndexSlice<IdxSz, [i32]> = &mut v[..=IdxSz::new(3)];
+        assert_eq!(s, &[0, 1, 2, 3]);
+    }
+    assert_eq!(&mut v[IdxSz::new(3)], &mut 3);
+
+    assert_eq!(&mut v[3], &mut 3); // usize is allowed.
+}
+
+#[test]
+fn test_get() {
+    let v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+
+    let s: Option<&IndexSlice<IdxSz, [i32]>> = v.get(..);
+    assert_eq!(s.unwrap(), &[0, 1, 2, 3, 4]);
+    let s: Option<&IndexSlice<IdxSz, [i32]>> = v.get(IdxSz::new(1)..);
+    assert_eq!(s.unwrap(), &[1, 2, 3, 4]);
+    let s: Option<&IndexSlice<IdxSz, [i32]>> = v.get(IdxSz::new(1)..IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[1, 2]);
+    let s: Option<&IndexSlice<IdxSz, [i32]>> = v.get(IdxSz::new(1)..=IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[1, 2, 3]);
+    let s: Option<&IndexSlice<IdxSz, [i32]>> = v.get(..=IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[0, 1, 2, 3]);
+
+    assert_eq!(v.get(IdxSz::new(3)), Some(&3));
+    assert_eq!(v.get(3), Some(&3));
+}
+
+#[test]
+fn test_get_mut() {
+    let mut v: IndexVec<IdxSz, i32> = index_vec![0, 1, 2, 3, 4];
+    let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(..);
+    assert_eq!(s.unwrap(), &[0, 1, 2, 3, 4]);
+    let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(IdxSz::new(1)..);
+    assert_eq!(s.unwrap(), &[1, 2, 3, 4]);
+    let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(IdxSz::new(1)..IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[1, 2]);
+    let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(IdxSz::new(1)..=IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[1, 2, 3]);
+    let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(..=IdxSz::new(3));
+    assert_eq!(s.unwrap(), &[0, 1, 2, 3]);
+    assert_eq!(v.get_mut(IdxSz::new(3)), Some(&mut 3));
+    assert_eq!(v.get_mut(3), Some(&mut 3));
 }
 
 #[test]

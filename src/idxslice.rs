@@ -1,5 +1,39 @@
 use super::*;
 
+/// A slice that only accepts indices of a specific type. Note that the intended
+/// usage is as `IndexSlice<I, [T]>`.
+///
+/// This is a thin wrapper around a `[T]`, to the point where the backing  is a
+/// public property (called `raw`). This is in part because I know this API is
+/// not a complete mirror of Vec's (patches welcome). In the worst case, you can
+/// always do what you need to the slice itself.
+///
+/// ## Some notes on the APIs
+///
+/// - Most of the Slice APIs are present.
+///     - Any that aren't can be trivially accessed on the underlying `raw`
+///       field, which is public.
+///
+/// - Apis that take or return usizes referring to the positions of items were
+///   replaced with ones that take Idx.
+///
+/// - Apis that take `R: RangeBounds<usize>` take an
+///   [`IdxRangeBounds<I>`][IdxRangeBounds], which is basically a
+///   `RangeBounds<I>`.
+/// - Apis that take `SliceIndex<usize>` take an
+///   [`IdxSliceIndex<I>`][IdxSliceIndex], which is basically a `SliceIndex<I>`.
+///
+/// - Most iterator functions where `the_iter().enumerate()` would refer to
+///   indices have been given `_enumerated` variants. E.g.
+///   [`IndexSlice::iter_enumerated`], etc. This is because
+///   `v.iter().enumerate()` would be `(usize, &T)`, but you want `(I, &T)`.
+///
+/// The following extensions are added:
+///
+/// - [`IndexSlice::indices`]: an Iterator over the indices of type `I`.
+/// - Various `enumerated` iterators mentioned earlier
+/// - [`IndexSlice::position`], [`IndexSlice::rposition`] as
+///   `self.iter().position()` will return a `Option<usize>`
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct IndexSlice<I: Idx, T: ?Sized> {
@@ -7,7 +41,9 @@ pub struct IndexSlice<I: Idx, T: ?Sized> {
     pub raw: T,
 }
 
-unsafe impl<I: Idx, T> Send for IndexSlice<I, T> where T: Send {}
+// Whether `IndexSlice` is `Send` depends only on the data,
+// not the phantom data.
+unsafe impl<I: Idx, T> Send for IndexSlice<I, [T]> where T: Send {}
 
 impl<I: Idx, T: fmt::Debug + ?Sized> fmt::Debug for IndexSlice<I, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -22,25 +58,25 @@ type SliceMappedMut<Iter, I, T> = iter::Map<Iter, (fn(&mut [T]) -> &mut IndexSli
 
 impl<I: Idx, T> IndexSlice<I, [T]> {
     /// Construct a new IdxSlice by wrapping an existing slice.
-    #[inline]
+    #[inline(always)]
     pub fn new<S: AsRef<[T]> + ?Sized>(s: &S) -> &Self {
         Self::from_slice(s.as_ref())
     }
 
     /// Construct a new mutable IdxSlice by wrapping an existing mutable slice.
-    #[inline]
+    #[inline(always)]
     pub fn new_mut<S: AsMut<[T]> + ?Sized>(s: &mut S) -> &mut Self {
         Self::from_slice_mut(s.as_mut())
     }
 
     /// Construct a new IdxSlice by wrapping an existing slice.
-    #[inline]
+    #[inline(always)]
     pub fn from_slice(s: &[T]) -> &Self {
         unsafe { &*(s as *const [T] as *const Self) }
     }
 
     /// Construct a new mutable IdxSlice by wrapping an existing mutable slice.
-    #[inline]
+    #[inline(always)]
     pub fn from_slice_mut(s: &mut [T]) -> &mut Self {
         unsafe { &mut *(s as *mut [T] as *mut Self) }
     }
@@ -70,13 +106,13 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Returns the underlying slice.
-    #[inline]
+    #[inline(always)]
     pub fn as_raw_slice_mut(&mut self) -> &mut [T] {
         &mut self.raw
     }
 
     /// Returns the underlying slice.
-    #[inline]
+    #[inline(always)]
     pub fn as_raw_slice(&self) -> &[T] {
         &self.raw
     }
@@ -122,7 +158,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Get a iterator over reverences to our values.
     ///
-    /// See also [`IndexVec::iter_enumerated`], which gives you indices (of the
+    /// See also [`IndexSlice::iter_enumerated`], which gives you indices (of the
     /// correct type) as you iterate.
     #[inline]
     pub fn iter(&self) -> slice::Iter<'_, T> {
@@ -131,7 +167,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Get a iterator over mut reverences to our values.
     ///
-    /// See also [`IndexVec::iter_mut_enumerated`], which gives you indices (of
+    /// See also [`IndexSlice::iter_mut_enumerated`], which gives you indices (of
     /// the correct type) as you iterate.
     #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
@@ -140,7 +176,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Similar to `self.iter().enumerate()` but with indices of `I` and not
     /// `usize`.
-    #[inline]
+    #[inline(always)]
     pub fn iter_enumerated(&self) -> Enumerated<slice::Iter<'_, T>, I, &T> {
         self.raw
             .iter()
@@ -149,19 +185,46 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Get an interator over all our indices.
-    #[inline]
+    #[inline(always)]
     pub fn indices(&self) -> iter::Map<Range<usize>, fn(usize) -> I> {
-        (0..self.len()).map(I::from_usize)
+        (0..self.raw.len()).map(I::from_usize)
     }
 
     /// Similar to `self.iter_mut().enumerate()` but with indices of `I` and not
     /// `usize`.
-    #[inline]
+    #[inline(always)]
     pub fn iter_mut_enumerated(&mut self) -> Enumerated<slice::IterMut<'_, T>, I, &mut T> {
         self.raw
             .iter_mut()
             .enumerate()
             .map(|(i, t)| (I::from_usize(i), t))
+    }
+
+    /// Forwards to the slice's `sort` implementation.
+    #[inline]
+    pub fn sort(&mut self)
+    where
+        T: Ord,
+    {
+        self.raw.sort()
+    }
+
+    /// Forwards to the slice's `sort_by` implementation.
+    #[inline]
+    pub fn sort_by<F: FnMut(&T, &T) -> core::cmp::Ordering>(&mut self, compare: F) {
+        self.raw.sort_by(compare)
+    }
+
+    /// Forwards to the slice's `sort_by_key` implementation.
+    #[inline]
+    pub fn sort_by_key<F: FnMut(&T) -> K, K: Ord>(&mut self, f: F) {
+        self.raw.sort_by_key(f)
+    }
+
+    /// Forwards to the slice's `sort_by_cached_key` implementation.
+    #[inline]
+    pub fn sort_by_cached_key<F: FnMut(&T) -> K, K: Ord>(&mut self, f: F) {
+        self.raw.sort_by_cached_key(f)
     }
 
     /// Forwards to the slice's `sort_unstable` implementation.
@@ -283,7 +346,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
     /// Searches for an element in an iterator, returning its index. This is
     /// equivalent to `Iterator::position`, but returns `I` and not `usize`.
-    #[inline]
+    #[inline(always)]
     pub fn position<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
         self.raw.iter().position(f).map(I::from_usize)
     }
@@ -291,7 +354,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     /// Searches for an element in an iterator from the right, returning its
     /// index. This is equivalent to `Iterator::position`, but returns `I` and
     /// not `usize`.
-    #[inline]
+    #[inline(always)]
     pub fn rposition<F: FnMut(&T) -> bool>(&self, f: F) -> Option<I> {
         self.raw.iter().rposition(f).map(I::from_usize)
     }
@@ -333,7 +396,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Return the the last element, if we are not empty.
-    #[inline]
+    #[inline(always)]
     pub fn last(&self) -> Option<&T> {
         self.len()
             .checked_sub(1)
@@ -383,35 +446,35 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `windows` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn windows(&self, size: usize) -> SliceMapped<slice::Windows<'_, T>, I, T> {
         self.raw.windows(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn chunks(&self, size: usize) -> SliceMapped<slice::Chunks<'_, T>, I, T> {
         self.raw.chunks(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn chunks_mut(&mut self, size: usize) -> SliceMappedMut<slice::ChunksMut<'_, T>, I, T> {
         self.raw.chunks_mut(size).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `chunks_exact` iterator with one that
-    /// yields `IdxSlice`s with the correct index type.
+    /// yields `IndexSlice`s with the correct index type.
     #[inline]
     pub fn chunks_exact(&self, chunk_size: usize) -> SliceMapped<slice::ChunksExact<'_, T>, I, T> {
         self.raw.chunks_exact(chunk_size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `chunks_exact_mut` iterator with one that
-    /// yields `IdxSlice`s with the correct index type.
+    /// yields `IndexSlice`s with the correct index type.
     #[inline]
     pub fn chunks_exact_mut(
         &mut self,
@@ -423,21 +486,21 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `rchunks` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rchunks(&self, size: usize) -> SliceMapped<slice::RChunks<'_, T>, I, T> {
         self.raw.rchunks(size).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rchunks_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rchunks_mut(&mut self, size: usize) -> SliceMappedMut<slice::RChunksMut<'_, T>, I, T> {
         self.raw.rchunks_mut(size).map(IndexSlice::new_mut)
     }
 
     /// Wraps the underlying slice's `rchunks_exact` iterator with one that
-    /// yields `IdxSlice`s with the correct index type.
+    /// yields `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rchunks_exact(
         &self,
@@ -447,7 +510,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `rchunks_exact_mut` iterator with one that
-    /// yields `IdxSlice`s with the correct index type.
+    /// yields `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rchunks_exact_mut(
         &mut self,
@@ -459,14 +522,14 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `split` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn split<F: FnMut(&T) -> bool>(&self, f: F) -> SliceMapped<slice::Split<'_, T, F>, I, T> {
         self.raw.split(f).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `split_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn split_mut<F: FnMut(&T) -> bool>(
         &mut self,
@@ -476,14 +539,14 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `rsplit` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rsplit<F: FnMut(&T) -> bool>(&self, f: F) -> SliceMapped<slice::RSplit<'_, T, F>, I, T> {
         self.raw.rsplit(f).map(IndexSlice::new)
     }
 
     /// Wraps the underlying slice's `rsplit_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rsplit_mut<F: FnMut(&T) -> bool>(
         &mut self,
@@ -493,7 +556,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `splitn` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn splitn<F: FnMut(&T) -> bool>(
         &self,
@@ -503,7 +566,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
         self.raw.splitn(n, f).map(IndexSlice::new)
     }
     /// Wraps the underlying slice's `splitn_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn splitn_mut<F: FnMut(&T) -> bool>(
         &mut self,
@@ -514,7 +577,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `rsplitn` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rsplitn<F: FnMut(&T) -> bool>(
         &self,
@@ -525,7 +588,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Wraps the underlying slice's `rsplitn_mut` iterator with one that yields
-    /// `IdxSlice`s with the correct index type.
+    /// `IndexSlice`s with the correct index type.
     #[inline]
     pub fn rsplitn_mut<F: FnMut(&T) -> bool>(
         &mut self,
@@ -675,12 +738,14 @@ impl<'a, I: Idx, T> IntoIterator for &'a mut IndexSlice<I, [T]> {
 }
 
 impl<I: Idx, T> Default for &IndexSlice<I, [T]> {
+    #[inline]
     fn default() -> Self {
         IndexSlice::new(&[])
     }
 }
 
 impl<I: Idx, T> Default for &mut IndexSlice<I, [T]> {
+    #[inline]
     fn default() -> Self {
         IndexSlice::new_mut(&mut [])
     }
@@ -732,7 +797,9 @@ impl<I: Idx, T: Clone> Clone for Box<IndexSlice<I, [T]>> {
 impl<I: Idx, A> FromIterator<A> for Box<IndexSlice<I, [A]>> {
     #[inline]
     fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
-        iter.into_iter().collect::<IndexVec<I, _>>().into_boxed_slice()
+        iter.into_iter()
+            .collect::<IndexVec<I, _>>()
+            .into_boxed_slice()
     }
 }
 
@@ -747,9 +814,8 @@ impl<I: Idx, A> IntoIterator for Box<IndexSlice<I, [A]>> {
 }
 
 impl<I: Idx, A> Default for Box<IndexSlice<I, [A]>> {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         index_vec![].into()
     }
 }
-
