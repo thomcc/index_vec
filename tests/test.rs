@@ -285,8 +285,8 @@ fn test_drain() {
 
     let mut vec: IndexVec<Idx32, ()> = index_vec![(), (), ()];
     let mut vec2: IndexVec<Idx32, ()> = index_vec![];
-    for i in vec.drain(..) {
-        vec2.push(i);
+    for _i in vec.drain(..) {
+        vec2.push(());
     }
     assert_eq!(vec, []);
     assert_eq!(vec2, [(), (), ()]);
