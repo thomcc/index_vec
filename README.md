@@ -2,7 +2,6 @@
 
 [![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec) ![crates.io](https://img.shields.io/crates/v/index_vec.svg) [![CircleCI](https://circleci.com/gh/thomcc/index_vec.svg?style=svg)](https://circleci.com/gh/thomcc/index_vec)
 
-**Note: API still unstable during 0.0.x**
 This crate helps with defining "newtype"-style wrappers around `usize` (or
 other integers), and `Vec<T>` so that some additional type safety can be
 gained at zero cost.
