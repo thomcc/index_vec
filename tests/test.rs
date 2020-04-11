@@ -25,6 +25,9 @@ index_vec::define_index_type! {
 
 index_vec::define_index_type! {
     pub struct Idx32 = u32;
+    DEBUG_FORMAT = "Test({:?})";
+    DISPLAY_FORMAT = "foo {}";
+    IMPL_RAW_CONVERSIONS = true;
 }
 
 index_vec::define_index_type! {
@@ -93,7 +96,7 @@ fn test_idx_arith() {
 }
 
 #[test]
-fn test_idx_checks() {
+fn test_idx_checks1() {
     let v: u32 = Idx32::new(4).raw();
     assert_eq!(v, 4);
 
@@ -113,35 +116,57 @@ fn test_idx_checks() {
 
     assert_eq!(SmallUnchecked::MAX_INDEX, 255);
     assert_eq!(SmallUncheckedEarly::MAX_INDEX, 0x7f);
+}
 
+#[test]
+fn test_idx_checks2() {
     // all shouldn't panic
 
-    let _ = SmallChecked::from_raw(150);
-    let _ = SmallChecked::from_usize(150);
-    let _ = SmallChecked::from_usize(255);
-    let _ = SmallChecked::from_usize(0);
+    let v = SmallChecked::from_raw(150);
+    assert_eq!(v, 150);
+    let v = SmallChecked::from_usize(150);
+    assert_eq!(v, 150);
+    let v = SmallChecked::from_usize(255);
+    assert_eq!(v, 255);
+    let v = SmallChecked::from_usize(0);
+    assert_eq!(v, 0);
 
-    let _ = SmallCheckedEarly::from_usize(0x7f);
-    let _ = SmallCheckedEarly::from_usize(0);
+    let v = SmallCheckedEarly::from_usize(0x7f);
+    assert_eq!(v, 0x7f);
+    let v = SmallCheckedEarly::from_usize(0);
+    assert_eq!(v, 0);
 
-    let _ = SmallUncheckedEarly::from_raw(0xff);
-    let _ = SmallUncheckedEarly::from_usize(150);
-    let _ = SmallUncheckedEarly::from_usize(300);
-    let _ = SmallUnchecked::from_usize(150);
-    let _ = SmallUnchecked::from_usize(300);
+    let v = SmallUncheckedEarly::from_raw(0xff);
+    assert_eq!(v, 0xff);
+    let v = SmallUncheckedEarly::from_usize(150);
+    assert_eq!(v, 150);
+    let v = SmallUncheckedEarly::from_usize(300);
+    assert_eq!(v.raw(), 300usize as u8);
+    let v = SmallUnchecked::from_usize(150);
+    assert_eq!(v, 150);
+    let v = SmallUnchecked::from_usize(300);
+    assert_eq!(v.raw(), 300usize as u8);
 
-    let _ = SmallCheckedEarly::from_raw_unchecked(0xff);
-    let _ = SmallCheckedEarly::from_usize_unchecked(150);
-    let _ = SmallCheckedEarly::from_usize_unchecked(300);
-    let _ = SmallChecked::from_usize_unchecked(300);
+    let v = SmallCheckedEarly::from_raw_unchecked(0xff);
+    assert_eq!(v, 0xff);
+    let v = SmallCheckedEarly::from_usize_unchecked(150);
+    assert_eq!(v, 150);
+    let v = SmallCheckedEarly::from_usize_unchecked(300);
+    assert_eq!(v.raw(), 300usize as u8);
+    let v = SmallChecked::from_usize_unchecked(300);
+    assert_eq!(v.raw(), 300usize as u8);
 
     assert_eq!(<USize16 as Default>::default().index(), usize::max_value());
 
-    let _ = ZeroMaxIgnore::new((u16::max_value() as usize) + 1);
-    let _ = ZeroMaxIgnore::new(0) + 1;
+    let v = ZeroMaxIgnore::new((u16::max_value() as usize) + 1);
+    assert_eq!(v, 0);
+    let v = ZeroMaxIgnore::new(0) + 1;
+    assert_eq!(v, 1);
     // let _ = ZeroMaxIgnore::new(0) - 1;
-    let _ = ZeroMaxIgnore::new(2);
-    let _ = ZeroMaxIgnore::new((u16::max_value() as usize) + 1);
+    let v = ZeroMaxIgnore::new(2);
+    assert_eq!(v, 2);
+    let v = ZeroMaxIgnore::new((u16::max_value() as usize) + 1);
+    assert_eq!(v, 0);
 }
 
 #[test]
@@ -246,6 +271,47 @@ fn test_vec() {
 
     let new_i = strs.push("quux");
     assert_eq!(strs[new_i], "quux");
+}
+
+#[test]
+fn test_idx() {
+    let mut e = Idx32::new(0);
+    let one = Idx32::new(1);
+    e += 1;
+    assert_eq!(e, 1);
+    e -= 1;
+    assert_eq!(e, 0);
+    e += one;
+    assert_eq!(e, 1);
+    e -= one;
+    assert_eq!(e, 0);
+    let e2 = e + one;
+    assert_eq!(e2, 1);
+    let e2 = e2 - one;
+    assert_eq!(e2, 0);
+
+    let e2 = e + 1;
+    assert_eq!(e2, 1);
+    let e2 = e2 - 1;
+    assert_eq!(0, e2);
+
+    assert_eq!(40usize - Idx32::new(10), 30);
+
+    assert_eq!(u32::from(Idx32::new(500)), 500);
+    assert_eq!(Idx32::from(500u32), 500);
+}
+
+#[test]
+fn test_fmt() {
+    let i = format!("{:?}", Idx32::new(30));
+    assert_eq!(i, "Test(30)");
+    let i = format!("{}", Idx32::new(30));
+    assert_eq!(i, "foo 30");
+
+    let v: IndexVec<Idx32, i32> = index_vec![3, 4, 5];
+    assert_eq!(format!("{:?}", v), format!("{:?}", vec![3, 4, 5]));
+    assert_eq!(format!("{:#?}", v), format!("{:#?}", vec![3, 4, 5]));
+    assert_eq!(format!("{:?}", &v[..]), format!("{:?}", &[3, 4, 5]));
 }
 
 #[test]
