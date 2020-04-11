@@ -1,6 +1,8 @@
 # `index_vec`
 
-[![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec) ![crates.io](https://img.shields.io/crates/v/index_vec.svg) [![CircleCI](https://circleci.com/gh/thomcc/index_vec.svg?style=svg)](https://circleci.com/gh/thomcc/index_vec)
+[![Docs](https://docs.rs/index_vec/badge.svg)](https://docs.rs/index_vec)
+[![crates.io](https://img.shields.io/crates/v/index_vec.svg)](https://crates.io/crates/index_vec)
+[![Github CI](https://github.com/thomcc/index_vec/workflows/CI/badge.svg)](https://github.com/LiveSplit/thomcc/index_vec)
 
 This crate helps with defining "newtype"-style wrappers around `usize` (or
 other integers), and `Vec<T>` so that some additional type safety can be

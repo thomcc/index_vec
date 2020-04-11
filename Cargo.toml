@@ -11,7 +11,7 @@ categories = ["data-structures", "no-std", "rust-patterns"]
 readme = "README.md"
 
 [badges]
-circle-ci = { repository = "thomcc/index_vec", branch = "master" }
+# TODO: github CI badge
 
 [features]
 example_generated = []
