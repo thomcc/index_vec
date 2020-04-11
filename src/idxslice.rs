@@ -53,8 +53,8 @@ impl<I: Idx, T: fmt::Debug + ?Sized> fmt::Debug for IndexSlice<I, T> {
 /// `IndexBox<I, [T]>`: An alias for indexed boxed slice.
 pub type IndexBox<I, T> = Box<IndexSlice<I, T>>;
 
-type SliceMapped<Iter, I, T> = iter::Map<Iter, (fn(&[T]) -> &IndexSlice<I, [T]>)>;
-type SliceMappedMut<Iter, I, T> = iter::Map<Iter, (fn(&mut [T]) -> &mut IndexSlice<I, [T]>)>;
+type SliceMapped<Iter, I, T> = iter::Map<Iter, fn(&[T]) -> &IndexSlice<I, [T]>>;
+type SliceMappedMut<Iter, I, T> = iter::Map<Iter, fn(&mut [T]) -> &mut IndexSlice<I, [T]>>;
 
 impl<I: Idx, T> IndexSlice<I, [T]> {
     /// Construct a new IdxSlice by wrapping an existing slice.
@@ -599,12 +599,22 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     }
 
     /// Create a IdxSlice from its pointer and length.
+    ///
+    /// # Safety
+    ///
+    /// This is equivalent to `core::slice::from_raw_parts` and has the same
+    /// safety caveats.
     #[inline]
     pub unsafe fn from_raw_parts<'a>(data: *const T, len: usize) -> &'a Self {
         Self::new(slice::from_raw_parts(data, len))
     }
 
     /// Create a mutable IdxSlice from its pointer and length.
+    ///
+    /// # Safety
+    ///
+    /// This is equivalent to `core::slice::from_raw_parts_mut` and has the same
+    /// safety caveats.
     #[inline]
     pub unsafe fn from_raw_parts_mut<'a>(data: *mut T, len: usize) -> &'a mut Self {
         Self::new_mut(slice::from_raw_parts_mut(data, len))
@@ -790,7 +800,7 @@ impl<I: Idx, T: Clone> Clone for Box<IndexSlice<I, [T]>> {
     #[inline]
     fn clone(&self) -> Self {
         // Suboptimal, I think.
-        self.to_vec().clone().into_boxed_slice()
+        self.to_vec().into_boxed_slice()
     }
 }
 

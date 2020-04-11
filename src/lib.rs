@@ -236,7 +236,7 @@ impl<I: Idx, T: fmt::Debug> fmt::Debug for IndexVec<I, T> {
         fmt::Debug::fmt(&self.raw, fmt)
     }
 }
-type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, (fn((usize, T)) -> (I, T))>;
+type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, fn((usize, T)) -> (I, T)>;
 
 impl<I: Idx, T> IndexVec<I, T> {
     /// Construct a new IndexVec.
