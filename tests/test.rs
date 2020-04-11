@@ -399,7 +399,7 @@ fn test_indexing() {
 
     assert_eq!(v[IdxSz::new(3)], 3);
 
-    assert_eq!(v[3], 3); // usize is allowed.
+    // assert_eq!(v[3], 3); // usize is allowed.
 
     // Make sure the types are as expected
     let s: &IndexSlice<IdxSz, [i32]> = &v[..];
@@ -437,7 +437,7 @@ fn test_indexing() {
     }
     assert_eq!(&mut v[IdxSz::new(3)], &mut 3);
 
-    assert_eq!(&mut v[3], &mut 3); // usize is allowed.
+    // assert_eq!(&mut v[3], &mut 3); // usize is allowed.
 }
 
 #[test]
@@ -456,7 +456,7 @@ fn test_get() {
     assert_eq!(s.unwrap(), &[0, 1, 2, 3]);
 
     assert_eq!(v.get(IdxSz::new(3)), Some(&3));
-    assert_eq!(v.get(3), Some(&3));
+    // assert_eq!(v.get(3), Some(&3));
 }
 
 #[test]
@@ -473,7 +473,7 @@ fn test_get_mut() {
     let s: Option<&mut IndexSlice<IdxSz, [i32]>> = v.get_mut(..=IdxSz::new(3));
     assert_eq!(s.unwrap(), &[0, 1, 2, 3]);
     assert_eq!(v.get_mut(IdxSz::new(3)), Some(&mut 3));
-    assert_eq!(v.get_mut(3), Some(&mut 3));
+    // assert_eq!(v.get_mut(3), Some(&mut 3));
 }
 
 #[test]

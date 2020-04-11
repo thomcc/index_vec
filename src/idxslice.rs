@@ -650,7 +650,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
         } else {
             let last = self.last_idx();
             let split = self.split_at_mut(last);
-            Some((&mut split.1[0], split.0))
+            Some((&mut split.1.raw[0], split.0))
         }
     }
 }

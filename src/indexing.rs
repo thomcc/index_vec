@@ -109,29 +109,29 @@ impl<I: Idx, T> IdxSliceIndex<I, T> for core::ops::RangeFull {
     }
 }
 
-impl private_slice_index::Sealed for usize {}
-// As an ergonomic concession, implement this for `usize` as well, it's too painful without
-impl<I: Idx, T> IdxSliceIndex<I, T> for usize {
-    type Output = T;
+// impl private_slice_index::Sealed for usize {}
+// // As an ergonomic concession, implement this for `usize` as well, it's too painful without
+// impl<I: Idx, T> IdxSliceIndex<I, T> for usize {
+//     type Output = T;
 
-    #[inline]
-    fn get(self, slice: &IndexSlice<I, [T]>) -> Option<&Self::Output> {
-        slice.raw.get(self)
-    }
-    #[inline]
-    fn get_mut(self, slice: &mut IndexSlice<I, [T]>) -> Option<&mut Self::Output> {
-        slice.raw.get_mut(self)
-    }
+//     #[inline]
+//     fn get(self, slice: &IndexSlice<I, [T]>) -> Option<&Self::Output> {
+//         slice.raw.get(self)
+//     }
+//     #[inline]
+//     fn get_mut(self, slice: &mut IndexSlice<I, [T]>) -> Option<&mut Self::Output> {
+//         slice.raw.get_mut(self)
+//     }
 
-    #[inline]
-    fn index(self, slice: &IndexSlice<I, [T]>) -> &Self::Output {
-        &slice.raw[self]
-    }
-    #[inline]
-    fn index_mut(self, slice: &mut IndexSlice<I, [T]>) -> &mut Self::Output {
-        &mut slice.raw[self]
-    }
-}
+//     #[inline]
+//     fn index(self, slice: &IndexSlice<I, [T]>) -> &Self::Output {
+//         &slice.raw[self]
+//     }
+//     #[inline]
+//     fn index_mut(self, slice: &mut IndexSlice<I, [T]>) -> &mut Self::Output {
+//         &mut slice.raw[self]
+//     }
+// }
 
 /// This trait to function in API signatures where `Vec<T>` or `[T]` use `R:
 /// RangeBounds<usize>`. There are blanket implementations for the basic range
