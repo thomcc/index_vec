@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  # Test on stable and MSRV
+  test:
+    name: Test - ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable, 1.37.0]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: ${{ matrix.rust }}
+
+      - name: Run tests (default features)
+        run: cargo test --all-targets --verbose
+
+      - name: Run tests (all features)
+        run: cargo test --all-targets --verbose --all-features
+
+      - name: Run tests (no features)
+        run: cargo test --all-targets --verbose --no-default-features
+
+  # Ensure clippy doesn't complain.
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+          components: clippy
+
+      - name: Run clippy (default features)
+        run: cargo clippy --workspace --all-targets --verbose
+
+      - name: Run clippy (all features)
+        run: cargo clippy --workspace --all-targets --verbose --all-features
+
+      - name: Run clippy (no features)
+        run: cargo clippy --workspace --all-targets --verbose --no-default-features
+
+  # Ensure patch is formatted.
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  # Check doc reference links are all valid.
+  doc:
+    name: Doc check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
+
+      - name: Check docs
+        # Note: needs cargo rustdoc, not cargo doc.
+        run: cargo rustdoc -- -D warnings
