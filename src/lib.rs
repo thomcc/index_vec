@@ -254,7 +254,7 @@ impl<I: Idx, T> IndexVec<I, T> {
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
         // See if `I::from_usize` might be upset by this length.
-        let _ = I::from_usize(vec.len());
+        let _ = I::from_usize(vec.len().saturating_sub(1));
         IndexVec {
             raw: vec,
             _marker: PhantomData,
