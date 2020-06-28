@@ -569,7 +569,7 @@ macro_rules! __define_index_type_inner {
             type Output = $type;
             #[inline]
             fn sub(self, other: $type) -> $type {
-                $type::new(other.index().wrapping_sub(self.index()))
+                $type::new(self.index().wrapping_sub(other.index()))
             }
         }
 
