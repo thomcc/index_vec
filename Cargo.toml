@@ -1,6 +1,6 @@
 [package]
 name = "index_vec"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Thom Chiovoloni <chiovolonit@gmail.com>"]
 edition = "2018"
 description = "Newtype-style helpers for `Vec` and `usize`."
