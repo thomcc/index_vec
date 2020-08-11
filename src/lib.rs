@@ -241,7 +241,7 @@ type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, fn((usize, T)) ->
 impl<I: Idx, T> IndexVec<I, T> {
     /// Construct a new IndexVec.
     #[inline]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         IndexVec {
             raw: Vec::new(),
             _marker: PhantomData,
