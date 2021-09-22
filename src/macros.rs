@@ -442,13 +442,13 @@ macro_rules! __define_index_type_inner {
 
             /// Get the wrapped index as a usize.
             #[inline(always)]
-            $v fn index(self) -> usize {
+            $v const fn index(self) -> usize {
                 self._raw as usize
             }
 
             /// Get the wrapped index.
             #[inline(always)]
-            $v fn raw(self) -> $raw {
+            $v const fn raw(self) -> $raw {
                 self._raw
             }
 
