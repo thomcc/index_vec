@@ -54,12 +54,12 @@ impl CoolIndex {
     }
     /// Get the wrapped index as a usize.
     #[inline(always)]
-    pub fn index(self) -> usize {
+    pub const fn index(self) -> usize {
         self._raw as usize
     }
     /// Get the wrapped index.
     #[inline(always)]
-    pub fn raw(self) -> u32 {
+    pub const fn raw(self) -> u32 {
         self._raw
     }
     /// Asserts `v <= Self::MAX_INDEX` unless Self::CHECKS_MAX_INDEX is false.
