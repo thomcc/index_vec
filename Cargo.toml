@@ -1,6 +1,6 @@
 [package]
 name = "index_vec"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Thom Chiovoloni <chiovolonit@gmail.com>"]
 edition = "2018"
 description = "Newtype-style helpers for `Vec` and `usize`."
@@ -9,9 +9,6 @@ repository = "http://github.com/thomcc/index_vec"
 keywords = ["newtype", "vec", "index", "indexed", "usize"]
 categories = ["data-structures", "no-std", "rust-patterns"]
 readme = "README.md"
-
-[badges]
-# TODO: github CI badge
 
 [features]
 example_generated = []
