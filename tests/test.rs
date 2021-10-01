@@ -1,4 +1,4 @@
-#![allow(clippy::assertions_on_constants)]
+#![allow(clippy::assertions_on_constants, clippy::eq_op)]
 
 use index_vec::{index_vec, IndexSlice, IndexVec};
 
