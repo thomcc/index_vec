@@ -238,6 +238,16 @@ impl<I: Idx, T: fmt::Debug> fmt::Debug for IndexVec<I, T> {
 }
 type Enumerated<Iter, I, T> = iter::Map<iter::Enumerate<Iter>, fn((usize, T)) -> (I, T)>;
 
+/// Helper struct for debug formatting an IndexVec as key-value pairs.
+/// Created by [`IndexVec::fmt_enumerated`].
+#[derive(Clone, Copy)]
+pub struct FmtEnumerated<'a, I: Debug + Idx, T: Debug>(&'a IndexVec<I, T>);
+impl<'a, I: Debug + Idx, T: Debug> Debug for FmtEnumerated<'a, I, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.0.iter_enumerated()).finish()
+    }
+}
+
 impl<I: Idx, T> IndexVec<I, T> {
     /// Construct a new IndexVec.
     #[inline]
@@ -509,6 +519,15 @@ impl<I: Idx, T> IndexVec<I, T> {
     #[inline(always)]
     pub fn as_mut_slice(&mut self) -> &mut IndexSlice<I, [T]> {
         IndexSlice::new_mut(&mut self.raw)
+    }
+
+    /// Debug format the IndexVec as key-value pairs.
+    #[inline(always)]
+    pub fn fmt_enumerated(&self) -> FmtEnumerated<I, T>
+    where
+        T: Debug,
+    {
+        FmtEnumerated(self)
     }
 }
 
