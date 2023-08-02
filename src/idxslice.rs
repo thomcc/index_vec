@@ -56,6 +56,16 @@ pub type IndexBox<I, T> = Box<IndexSlice<I, T>>;
 type SliceMapped<Iter, I, T> = iter::Map<Iter, fn(&[T]) -> &IndexSlice<I, [T]>>;
 type SliceMappedMut<Iter, I, T> = iter::Map<Iter, fn(&mut [T]) -> &mut IndexSlice<I, [T]>>;
 
+/// Helper struct for debug formatting an IndexVec as key-value pairs.
+/// Created by [`IndexSlice::fmt_enumerated`].
+#[derive(Clone, Copy)]
+pub struct FmtEnumerated<'a, I: Debug + Idx, T: Debug>(&'a IndexSlice<I, [T]>);
+impl<'a, I: Debug + Idx, T: Debug> Debug for FmtEnumerated<'a, I, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.0.iter_enumerated()).finish()
+    }
+}
+
 impl<I: Idx, T> IndexSlice<I, [T]> {
     /// Construct a new IdxSlice by wrapping an existing slice.
     #[inline(always)]
@@ -198,6 +208,15 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
             .iter_mut()
             .enumerate()
             .map(|(i, t)| (I::from_usize(i), t))
+    }
+
+    /// Debug format as key-value pairs.
+    #[inline(always)]
+    pub fn fmt_enumerated(&self) -> FmtEnumerated<I, T>
+    where
+        T: Debug,
+    {
+        FmtEnumerated(self)
     }
 
     /// Forwards to the slice's `sort` implementation.
