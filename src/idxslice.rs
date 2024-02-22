@@ -71,7 +71,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Construct a new IdxSlice by wrapping an existing slice.
     #[inline(always)]
-    pub fn from_slice(s: &[T]) -> &Self {
+    pub const fn from_slice(s: &[T]) -> &Self {
         unsafe { &*(s as *const [T] as *const Self) }
     }
 
@@ -113,7 +113,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns the underlying slice.
     #[inline(always)]
-    pub fn as_raw_slice(&self) -> &[T] {
+    pub const fn as_raw_slice(&self) -> &[T] {
         &self.raw
     }
 
@@ -125,7 +125,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns an unsafe pointer to the slice's buffer.
     #[inline]
-    pub fn as_ptr(&self) -> *const T {
+    pub const fn as_ptr(&self) -> *const T {
         self.raw.as_ptr()
     }
 
@@ -140,7 +140,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns the length of our slice.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.raw.len()
     }
 
@@ -152,7 +152,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns true if we're empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.raw.is_empty()
     }
 
@@ -369,7 +369,7 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
     #[inline]
     pub fn split_at(&self, a: I) -> (&Self, &Self) {
         let (a, b) = self.raw.split_at(a.index());
-        (Self::new(a), Self::new(b))
+        (Self::from_slice(a), Self::from_slice(b))
     }
 
     /// Divides our slice into two at an index.
@@ -397,10 +397,8 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Return the the last element, if we are not empty.
     #[inline(always)]
-    pub fn last(&self) -> Option<&T> {
-        self.len()
-            .checked_sub(1)
-            .and_then(|i| self.get(I::from_usize(i)))
+    pub const fn last(&self) -> Option<&T> {
+        self.raw.last()
     }
 
     /// Return the the last element, if we are not empty.
@@ -412,8 +410,8 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Return the the first element, if we are not empty.
     #[inline]
-    pub fn first(&self) -> Option<&T> {
-        self.get(I::from_usize(0))
+    pub const fn first(&self) -> Option<&T> {
+        self.raw.first()
     }
 
     /// Return the the first element, if we are not empty.
@@ -622,11 +620,11 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns the first and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_first(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
-        if self.is_empty() {
-            None
+    pub const fn split_first(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
+        if let Some((first, rem)) = self.raw.split_first() {
+            Some((first, Self::from_slice(rem)))
         } else {
-            Some((&self[I::from_usize(0)], &self[I::from_usize(1)..]))
+            None
         }
     }
 
@@ -643,12 +641,11 @@ impl<I: Idx, T> IndexSlice<I, [T]> {
 
     /// Returns the last and all the rest of the elements of the slice, or `None` if it is empty.
     #[inline]
-    pub fn split_last(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
-        if self.is_empty() {
-            None
+    pub const fn split_last(&self) -> Option<(&T, &IndexSlice<I, [T]>)> {
+        if let Some((last, rem)) = self.raw.split_last() {
+            Some((last, Self::from_slice(rem)))
         } else {
-            let last = self.last_idx();
-            Some((&self[last], &self[..last]))
+            None
         }
     }
 
