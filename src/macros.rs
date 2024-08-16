@@ -209,6 +209,58 @@ macro_rules! __internal_maybe_index_impl_serde {
     ($type:ident) => {};
 }
 
+#[cfg(feature = "rkyv")]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __internal_maybe_index_impl_rkyv {
+    ($type:ident) => {
+        impl rkyv::Archive for $type {
+            type Archived = <usize as rkyv::Archive>::Archived;
+            type Resolver = <usize as rkyv::Archive>::Resolver;
+
+            #[inline]
+            unsafe fn resolve(
+                &self,
+                pos: usize,
+                resolver: Self::Resolver,
+                out: *mut Self::Archived,
+            ) {
+                self.index().resolve(pos, resolver, out)
+            }
+        }
+
+        impl<S: rkyv::ser::ScratchSpace + rkyv::ser::Serializer + ?Sized> rkyv::Serialize<S>
+            for $type
+        {
+            #[inline]
+            fn serialize(
+                &self,
+                serializer: &mut S,
+            ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+                self.index().serialize(serializer)
+            }
+        }
+
+        impl<D: rkyv::Fallible + ?Sized> rkyv::Deserialize<$type, D>
+            for rkyv::Archived<rkyv::FixedUsize>
+        {
+            #[inline]
+            fn deserialize(&self, deserializer: &mut D) -> Result<$type, D::Error> {
+                let index = rkyv::Archived::<rkyv::FixedUsize>::deserialize(self, deserializer)?;
+
+                Ok($type::from_usize(index))
+            }
+        }
+    };
+}
+
+#[cfg(not(feature = "rkyv"))]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __internal_maybe_index_impl_rkyv {
+    ($type:ident) => {};
+}
+
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __define_index_type_inner {
@@ -614,5 +666,6 @@ macro_rules! __define_index_type_inner {
         }
 
         $crate::__internal_maybe_index_impl_serde!($type);
+        $crate::__internal_maybe_index_impl_rkyv!($type);
     };
 }
