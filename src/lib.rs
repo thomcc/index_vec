@@ -804,3 +804,44 @@ impl<'de, I: Idx, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> fo
         Box::<[T]>::deserialize(deserializer).map(Into::into)
     }
 }
+
+#[cfg(feature = "rkyv")]
+impl<I: Idx, T: rkyv::Archive> rkyv::Archive for IndexVec<I, T> {
+    type Archived = <Vec<T> as rkyv::Archive>::Archived;
+    type Resolver = <Vec<T> as rkyv::Archive>::Resolver;
+
+    #[inline]
+    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
+        self.raw.resolve(pos, resolver, out)
+    }
+}
+
+#[cfg(feature = "rkyv")]
+impl<
+        I: Idx,
+        T: rkyv::Serialize<S>,
+        S: rkyv::ser::ScratchSpace + rkyv::ser::Serializer + ?Sized,
+    > rkyv::Serialize<S> for IndexVec<I, T>
+{
+    #[inline]
+    fn serialize(
+        &self,
+        serializer: &mut S,
+    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+        self.raw.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "rkyv")]
+impl<I: Idx, T: rkyv::Archive, D: rkyv::Fallible + ?Sized> rkyv::Deserialize<IndexVec<I, T>, D>
+    for rkyv::vec::ArchivedVec<T::Archived>
+where
+    [T::Archived]: rkyv::DeserializeUnsized<[T], D>,
+{
+    #[inline]
+    fn deserialize(&self, deserializer: &mut D) -> Result<IndexVec<I, T>, D::Error> {
+        let raw = rkyv::vec::ArchivedVec::deserialize(self, deserializer)?;
+
+        Ok(IndexVec::from_vec(raw))
+    }
+}

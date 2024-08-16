@@ -10,12 +10,12 @@ keywords = ["newtype", "vec", "index", "indexed", "usize"]
 categories = ["data-structures", "no-std", "rust-patterns"]
 readme = "README.md"
 
+[dependencies]
+serde = { version = "1", optional = true }
+rkyv = { version = "0.7", optional = true }
+
 [features]
+serde = ["dep:serde"]
+rkyv = ["dep:rkyv"]
 example_generated = []
 default = []
-
-[dependencies]
-serde = {version = "1", optional = true}
-
-[package.metadata.docs.rs]
-features = ["example_generated"]
