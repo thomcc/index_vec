@@ -460,7 +460,7 @@ macro_rules! __define_index_type_inner {
                 }
             }
 
-            const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::min_value() as usize];
+            const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::MIN as usize];
         }
 
         impl core::fmt::Debug for $type {

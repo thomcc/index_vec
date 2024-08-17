@@ -150,7 +150,6 @@ pub use indexing::{IdxRangeBounds, IdxSliceIndex};
 
 #[macro_use]
 mod macros;
-pub use macros::*;
 
 #[cfg(any(test, feature = "example_generated"))]
 pub mod example_generated;
@@ -175,14 +174,14 @@ pub mod example_generated;
 /// the typical cases (E.g. Idx is a newtyped usize or u32), to become more
 /// complex.
 pub trait Idx: Copy + 'static + Ord + Debug + Hash {
-    /// Construct an Index from a usize. This is equivalent to From<usize>.
+    /// Construct an Index from a usize. This is equivalent to `From<usize>`.
     ///
     /// Note that this will panic if `idx` does not fit (unless checking has
     /// been disabled, as mentioned above). Also note that `Idx` implementations
     /// are free to define what "fit" means as they desire.
     fn from_usize(idx: usize) -> Self;
 
-    /// Get the underlying index. This is equivalent to Into<usize>
+    /// Get the underlying index. This is equivalent to `Into<usize>`
     fn index(self) -> usize;
 }
 
@@ -229,6 +228,7 @@ pub struct IndexVec<I: Idx, T> {
 
 // Whether `IndexVec` is `Send` depends only on the data,
 // not the phantom data.
+#[allow(renamed_and_removed_lints, suspicious_auto_trait_impls)]
 unsafe impl<I: Idx, T> Send for IndexVec<I, T> where T: Send {}
 
 impl<I: Idx, T: fmt::Debug> fmt::Debug for IndexVec<I, T> {
