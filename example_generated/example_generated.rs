@@ -12,12 +12,11 @@
 pub struct CoolIndex {
     _raw: u32,
 }
-
 impl CoolIndex {
     /// If `Self::CHECKS_MAX_INDEX` is true, we'll assert if trying to
     /// produce a value larger than this in any of the ctors that don't
     /// have `unchecked` in their name.
-    pub const MAX_INDEX: usize = i32::max_value() as usize;
+    pub const MAX_INDEX: usize = i32::MAX as usize;
     /// Does this index type assert if asked to construct an index
     /// larger than MAX_INDEX?
     pub const CHECKS_MAX_INDEX: bool = !false;
@@ -69,16 +68,11 @@ impl CoolIndex {
             crate::__max_check_fail(v, Self::MAX_INDEX);
         }
     }
-    const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <u32>::min_value() as usize];
+    const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <u32>::MIN as usize];
 }
 impl core::fmt::Debug for CoolIndex {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_fmt(::core::fmt::Arguments::new_v1(
-            &["CI(", ")"],
-            &match (&self.index(),) {
-                (arg0,) => [::core::fmt::ArgumentV1::new(arg0, ::core::fmt::Debug::fmt)],
-            },
-        ))
+        f.write_fmt(format_args!("CI({0:?})", self.index()))
     }
 }
 impl core::cmp::PartialOrd<usize> for CoolIndex {
@@ -122,7 +116,7 @@ impl core::ops::Sub<usize> for CoolIndex {
 impl core::ops::AddAssign<usize> for CoolIndex {
     #[inline]
     fn add_assign(&mut self, other: usize) {
-        *self = *self + other
+        *self = *self + other;
     }
 }
 impl core::ops::SubAssign<usize> for CoolIndex {
@@ -163,13 +157,13 @@ impl core::ops::Sub for CoolIndex {
     type Output = CoolIndex;
     #[inline]
     fn sub(self, other: CoolIndex) -> CoolIndex {
-        CoolIndex::new(other.index().wrapping_sub(self.index()))
+        CoolIndex::new(self.index().wrapping_sub(other.index()))
     }
 }
 impl core::ops::AddAssign for CoolIndex {
     #[inline]
     fn add_assign(&mut self, other: CoolIndex) {
-        *self = *self + other
+        *self = *self + other;
     }
 }
 impl core::ops::SubAssign for CoolIndex {
@@ -215,15 +209,7 @@ impl From<u32> for CoolIndex {
 }
 impl core::fmt::Display for CoolIndex {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_fmt(::core::fmt::Arguments::new_v1(
-            &["", " is a ~Cool Index~"],
-            &match (&self.index(),) {
-                (arg0,) => [::core::fmt::ArgumentV1::new(
-                    arg0,
-                    ::core::fmt::Display::fmt,
-                )],
-            },
-        ))
+        f.write_fmt(format_args!("{0} is a ~Cool Index~", self.index()))
     }
 }
 impl Default for CoolIndex {
