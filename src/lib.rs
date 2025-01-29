@@ -136,6 +136,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
+use core::convert::TryInto;
 use core::fmt;
 use core::fmt::Debug;
 use core::hash::Hash;
@@ -183,6 +184,36 @@ pub trait Idx: Copy + 'static + Ord + Debug + Hash {
 
     /// Get the underlying index. This is equivalent to `Into<usize>`
     fn index(self) -> usize;
+}
+
+impl Idx for u8 {
+    fn from_usize(idx: usize) -> Self {
+        idx.try_into().unwrap()
+    }
+
+    fn index(self) -> usize {
+        self.into()
+    }
+}
+
+impl Idx for u16 {
+    fn from_usize(idx: usize) -> Self {
+        idx.try_into().unwrap()
+    }
+
+    fn index(self) -> usize {
+        self.into()
+    }
+}
+
+impl Idx for u32 {
+    fn from_usize(idx: usize) -> Self {
+        idx.try_into().unwrap()
+    }
+
+    fn index(self) -> usize {
+        self as usize
+    }
 }
 
 /// A macro equivalent to the stdlib's `vec![]`, but producing an `IndexVec`.
