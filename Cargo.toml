@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 serde = { version = "1", optional = true }
 rkyv = { version = "0.7", optional = true }
+paste = "1.0.15"
 
 [features]
 example_generated = []

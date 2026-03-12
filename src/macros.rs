@@ -52,7 +52,7 @@
 ///
 /// Assert if anything tries to construct an index above that value.
 ///
-/// By default, this is `$raw_type::max_value() as usize`, e.g. we check that
+/// By default, this is `<$raw_type as BaseIdx>::MAX_USIZE`, e.g. we check that
 /// our cast from `usize` to our wrapper is lossless, but we assume any all
 /// instance of `$raw_type` is valid in this index domain.
 ///
@@ -166,7 +166,7 @@ macro_rules! define_index_type {
             @derives [#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]]
             @decl [$v struct $type ($raw)]
             @debug_fmt ["{}"]
-            @max [(<$raw>::max_value() as usize)]
+            @max [(<$raw as $crate::BaseIdx>::MAX_USIZE)]
             @no_check_max [false]
         }
     };
@@ -464,7 +464,7 @@ macro_rules! __define_index_type_inner {
             /// Construct this index type from the wrapped integer type.
             #[inline(always)]
             $v fn from_raw(value: $raw) -> Self {
-                Self::from_usize(value as usize)
+                Self::from_usize(<$raw as $crate::BaseIdx>::Converter::to_usize(value).unwrap())
             }
 
             /// Construct this index type from one in a different domain
@@ -476,7 +476,7 @@ macro_rules! __define_index_type_inner {
             /// Construct from a usize without any checks.
             #[inline(always)]
             $v const fn from_usize_unchecked(value: usize) -> Self {
-                Self { _raw: value as $raw }
+                Self { _raw: <$raw as $crate::BaseIdx>::Converter::from_usize_unchecked(value) }
             }
 
             /// Construct from the underlying type without any checks.
@@ -489,13 +489,13 @@ macro_rules! __define_index_type_inner {
             #[inline]
             $v fn from_usize(value: usize) -> Self {
                 Self::check_index(value as usize);
-                Self { _raw: value as $raw }
+                Self { _raw: <$raw as $crate::BaseIdx>::Converter::from_usize_unchecked(value) }
             }
 
             /// Get the wrapped index as a usize.
             #[inline(always)]
             $v const fn index(self) -> usize {
-                self._raw as usize
+                <$raw as $crate::BaseIdx>::Converter::to_usize(self._raw).unwrap()
             }
 
             /// Get the wrapped index.
@@ -511,8 +511,6 @@ macro_rules! __define_index_type_inner {
                     $crate::__max_check_fail(v, Self::MAX_INDEX);
                 }
             }
-
-            const _ENSURE_RAW_IS_UNSIGNED: [(); 0] = [(); <$raw>::MIN as usize];
         }
 
         impl core::fmt::Debug for $type {

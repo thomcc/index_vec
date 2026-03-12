@@ -1,11 +1,19 @@
 #![allow(clippy::assertions_on_constants, clippy::eq_op)]
 
+use std::num::{NonZeroU8, NonZeroUsize};
+
 use index_vec::{index_vec, IndexSlice, IndexVec};
 
 index_vec::define_index_type! {
     pub struct USize16 = usize;
     MAX_INDEX = u16::MAX as usize;
     DEFAULT = USize16::from_raw_unchecked(usize::MAX);
+}
+
+index_vec::define_index_type! {
+    pub struct NonZeroUsize16 = NonZeroUsize;
+    MAX_INDEX = u16::MAX as usize;
+    DEFAULT = NonZeroUsize16::from_raw_unchecked(NonZeroUsize::new(usize::MAX).unwrap());
 }
 
 index_vec::define_index_type! {
@@ -45,6 +53,10 @@ index_vec::define_index_type! {
 
 index_vec::define_index_type! {
     pub struct SmallChecked = u8;
+}
+
+index_vec::define_index_type! {
+    pub struct SmallNonZeroChecked = NonZeroU8;
 }
 
 index_vec::define_index_type! {
@@ -106,9 +118,11 @@ fn test_idx_checks1() {
     assert_eq!(SmallCheckedEarly::from_raw_unchecked(0xff).raw(), 0xff);
 
     assert!(SmallChecked::CHECKS_MAX_INDEX);
+    assert!(SmallNonZeroChecked::CHECKS_MAX_INDEX);
     assert!(SmallCheckedEarly::CHECKS_MAX_INDEX);
 
     assert_eq!(SmallChecked::MAX_INDEX, 255);
+    assert_eq!(SmallNonZeroChecked::MAX_INDEX, 255);
     assert_eq!(SmallCheckedEarly::MAX_INDEX, 0x7f);
 
     assert!(!SmallUnchecked::CHECKS_MAX_INDEX);
@@ -129,6 +143,15 @@ fn test_idx_checks2() {
     let v = SmallChecked::from_usize(255);
     assert_eq!(v, 255);
     let v = SmallChecked::from_usize(0);
+    assert_eq!(v, 0);
+
+    let v = SmallNonZeroChecked::from_raw(NonZeroU8::new(150).unwrap());
+    // Note that a non-zero value with internal representation 150 actually represents index 149 due to how non-zero integers are used
+    // to represent indices (the internally store `index + 1`).
+    assert_eq!(v, 149);
+    let v = SmallNonZeroChecked::from_usize(150);
+    assert_eq!(v, 150);
+    let v = SmallNonZeroChecked::from_usize(0);
     assert_eq!(v, 0);
 
     let v = SmallCheckedEarly::from_usize(0x7f);
@@ -155,8 +178,13 @@ fn test_idx_checks2() {
     assert_eq!(v.raw(), 300usize as u8);
     let v = SmallChecked::from_usize_unchecked(300);
     assert_eq!(v.raw(), 300usize as u8);
+    let v = SmallNonZeroChecked::from_usize_unchecked(300);
+    assert_eq!(v.raw().get(), (300usize as u8) + 1);
 
     assert_eq!(<USize16 as Default>::default().index(), usize::MAX);
+    // Note that due to how non zero integers represent indices (the store `index + 1` internally), the max index actually represents
+    // index `usize::MAX - 1`.
+    assert_eq!(<NonZeroUsize16 as Default>::default().index(), usize::MAX - 1);
 
     let v = ZeroMaxIgnore::new((u16::MAX as usize) + 1);
     assert_eq!(v, 0);
@@ -567,3 +595,28 @@ fn test_splits() {
     assert!(v.split_first_mut().is_none());
     assert!(v.split_last_mut().is_none());
 }
+
+#[test]
+fn test_non_zero_indices() {
+    let v: IndexVec<SmallNonZeroChecked, i32> = index_vec![5, 22];
+    let indices: Vec<SmallNonZeroChecked> = v.indices().collect();
+    assert_eq!(indices, [SmallNonZeroChecked::new(0), SmallNonZeroChecked::new(1)]);
+
+    // Internally, each non zero index should store the value `index + 1`.
+    let inner_values: Vec<u8> = v.indices().map(|index| index.raw().get()).collect();
+    assert_eq!(inner_values, [1, 2]);
+
+    // Regardless of the internal representation, the returned index values should be the real index values.
+    let index_values: Vec<usize> = v.indices().map(|index| index.index()).collect();
+    assert_eq!(index_values, [0, 1]);
+}
+
+#[test]
+fn test_non_zero_idx_get() {
+    let v: IndexVec<SmallNonZeroChecked, i32> = index_vec![5, 22, 123];
+    assert_eq!(v[SmallNonZeroChecked::new(1)], 22);
+
+    // Internally, each non zero index should store the value `index + 1`, so accessing raw index value 1 should actually access index 0.
+    assert_eq!(v[SmallNonZeroChecked::from_raw(NonZeroU8::new(1).unwrap())], 5);
+}
+

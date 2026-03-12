@@ -124,7 +124,6 @@
 //! - Allow use of indices for string types (the primary benefit here would
 //!   probably be the ability to e.g. use u32 without too much pain rather than
 //!   mixing up indices from different strings -- but you never know!)
-//! - Allow index types such as NonZeroU32 and such, if it can be done sanely.
 //! - ...
 //!
 #![allow(clippy::partialeq_ne_impl)]
@@ -145,8 +144,10 @@ use core::ops::Range;
 use core::slice;
 mod idxslice;
 mod indexing;
+mod baseidx;
 pub use idxslice::{IndexBox, IndexSlice};
 pub use indexing::{IdxRangeBounds, IdxSliceIndex};
+pub use baseidx::BaseIdx;
 
 #[macro_use]
 mod macros;
