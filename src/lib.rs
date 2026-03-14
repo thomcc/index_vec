@@ -289,7 +289,7 @@ impl<I: Idx, T> IndexVec<I, T> {
         &mut self,
         range: R,
         replace_with: It,
-    ) -> vec::Splice<<It as IntoIterator>::IntoIter>
+    ) -> vec::Splice<'_, <It as IntoIterator>::IntoIter>
     where
         It: IntoIterator<Item = T>,
         R: IdxRangeBounds<I>,
